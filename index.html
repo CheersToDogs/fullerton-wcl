@@ -441,7 +441,8 @@ const markerMap = {};
 async function fetchLive() {
   const params = new URLSearchParams({
     where:'1=1', outFields:'*', returnGeometry:'true',
-    resultRecordCount:'2000', orderByFields:'incident_date_and_time DESC', f:'json'
+    resultRecordCount:'2000', orderByFields:'incident_date_and_time DESC',
+    outSR:'4326', f:'json'
   });
   const res = await fetch(`${ARCGIS}/query?${params}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -449,7 +450,7 @@ async function fetchLive() {
   if (data.error) throw new Error(data.error.message);
   return (data.features||[]).map(f => ({
     ...f.attributes,
-    lat: f.geometry?.y ?? null,
+    lat: f.geometry?.y ?? null,  // with outSR=4326: y=latitude, x=longitude
     lon: f.geometry?.x ?? null,
   }));
 }
