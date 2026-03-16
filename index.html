@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Fullerton Watch Commander Log</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0d0f14;
+  --surface:  #13161e;
+  --surface2: #1a1e28;
+  --border:   #2a2f3d;
+  --border2:  #363c50;
+  --text:     #e2e8f0;
+  --muted:    #64748b;
+  --accent:   #3b82f6;
+  --accent2:  #1d4ed8;
+  --danger:   #ef4444;
+  --warn:     #f59e0b;
+  --mono:     'IBM Plex Mono', monospace;
+  --sans:     'IBM Plex Sans', system-ui, sans-serif;
+}
+
+body { background: var(--bg); color: var(--text); font-family: var(--sans); overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+
+/* ── Header ── */
+#header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 18px; background: var(--surface);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-mark { font-size: 22px; color: var(--accent); }
+.logo-title { font-family: var(--mono); font-size: 14px; font-weight: 600; letter-spacing: 0.02em; }
+.logo-sub { font-size: 10px; color: var(--muted); margin-top: 2px; font-family: var(--mono); }
+.live-badge { display: flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 12px; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.dot-live   { background: #22c55e; box-shadow: 0 0 6px #22c55e88; animation: pulse 2s infinite; }
+.dot-load   { background: #f59e0b; animation: pulse 0.7s infinite; }
+.dot-err    { background: var(--danger); }
+.dot-idle   { background: var(--muted); }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:.35} }
+.live-label { font-weight: 500; }
+.live-age   { color: var(--muted); }
+.new-badge  { background: #22c55e22; color: #22c55e; border: 1px solid #22c55e44; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; display: none; }
+.refresh-btn { background: none; border: 1px solid var(--border2); color: var(--muted); padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 14px; transition: all .15s; }
+.refresh-btn:hover { color: var(--text); border-color: var(--accent); }
+
+/* ── Error banner ── */
+#error-banner { background: #7f1d1d; color: #fca5a5; padding: 6px 18px; font-size: 12px; font-family: var(--mono); display: none; flex-shrink: 0; }
+
+/* ── Stats bar ── */
+#stats-bar {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 8px 18px; background: var(--surface);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+  font-family: var(--mono); font-size: 11px;
+}
+.stat-block { display: flex; flex-direction: column; align-items: center; min-width: 55px; }
+.stat-num   { font-size: 20px; font-weight: 600; color: var(--accent); line-height: 1; }
+.stat-num.danger { color: var(--danger); }
+.stat-lbl   { font-size: 9px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: .06em; }
+.zone-chips { display: flex; gap: 6px; }
+.zone-chip  { display: flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 4px; border: 1px solid; font-size: 11px; }
+.z-dot      { width: 7px; height: 7px; border-radius: 50%; }
+.type-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+.type-chip  { display: flex; align-items: center; gap: 5px; padding: 2px 7px; border-radius: 4px; background: var(--surface2); border: 1px solid var(--border); }
+.tc-lbl     { color: var(--muted); }
+.tc-cnt     { color: var(--text); font-weight: 600; }
+
+/* ── Main layout ── */
+#main { display: grid; grid-template-columns: 1fr 420px; flex: 1; overflow: hidden; }
+
+/* ── Map ── */
+#map-wrap { position: relative; overflow: hidden; }
+#map      { height: 100%; width: 100%; }
+#map-legend {
+  position: absolute; bottom: 18px; left: 10px; z-index: 1000;
+  background: var(--surface)ee; border: 1px solid var(--border);
+  padding: 7px 11px; border-radius: 6px; font-family: var(--mono); font-size: 11px;
+  backdrop-filter: blur(4px);
+}
+.leg-title { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
+.leg-row   { display: flex; align-items: center; gap: 5px; color: var(--text); margin-top: 3px; }
+.leg-dot   { width: 8px; height: 8px; border-radius: 50%; }
+
+/* Leaflet popup */
+.map-popup { font-family: var(--mono); font-size: 12px; line-height: 1.6; min-width: 170px; }
+.pp-type   { font-weight: 600; font-size: 13px; }
+.pp-num    { color: #64748b; font-size: 11px; }
+.pp-loc    { font-weight: 500; margin-top: 2px; }
+.pp-time   { color: #64748b; font-size: 11px; }
+.pp-cmd    { margin-top: 2px; }
+.pp-zone   { font-size: 11px; margin-top: 1px; }
+.leaflet-popup-content-wrapper { background: #1a1e28; border: 1px solid #2a2f3d; color: #e2e8f0; border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.6); }
+.leaflet-popup-tip { background: #1a1e28; }
+.leaflet-popup-content { margin: 10px 14px; }
+
+/* ── Right panel ── */
+#right { display: flex; flex-direction: column; overflow: hidden; border-left: 1px solid var(--border); }
+
+/* ── Incident card ── */
+#incident-card {
+  border-bottom: 1px solid var(--border); background: var(--surface);
+  flex-shrink: 0; max-height: 48%; overflow-y: auto; display: none;
+}
+.card-hdr { padding: 12px 14px 8px; border-bottom: 1px solid var(--border); border-left: 3px solid transparent; }
+.card-top { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.card-type { font-family: var(--mono); font-weight: 600; font-size: 14px; }
+.card-num  { font-family: var(--mono); color: var(--muted); font-size: 12px; flex: 1; }
+.card-prio { background: #7f1d1d; color: #fca5a5; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 700; letter-spacing: .06em; display: none; }
+.card-close { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 2px 4px; margin-left: auto; }
+.card-close:hover { color: var(--text); }
+.card-time { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 3px; }
+.card-body { padding: 10px 14px; }
+.card-row  { display: flex; gap: 10px; margin-bottom: 7px; }
+.card-key  { font-family: var(--mono); font-size: 10px; color: var(--muted); width: 78px; flex-shrink: 0; padding-top: 1px; text-transform: uppercase; letter-spacing: .05em; }
+.card-val  { font-size: 13px; color: var(--text); }
+.card-notif { color: var(--warn); }
+.card-veh   { font-family: var(--mono); font-size: 12px; color: var(--warn); }
+.remarks-section { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.remarks-lbl { font-family: var(--mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.remarks-note { color: var(--warn); font-size: 10px; }
+.card-footer { padding: 6px 14px; border-top: 1px solid var(--border); background: var(--surface2); font-family: var(--mono); font-size: 10px; color: var(--muted); }
+
+/* ── Remarks gate ── */
+.gate-btn {
+  display: flex; align-items: center; gap: 7px;
+  background: var(--surface2); border: 1px solid var(--border2);
+  color: var(--muted); padding: 7px 11px; border-radius: 5px;
+  cursor: pointer; font-size: 12px; font-family: var(--mono);
+  width: 100%; text-align: left; transition: all .15s;
+}
+.gate-btn:hover { border-color: var(--accent); color: var(--text); }
+.remarks-text { font-size: 13px; line-height: 1.65; color: var(--text); }
+.remarks-warn { font-family: var(--mono); font-size: 10px; color: var(--warn); background: #451a0322; border: 1px solid #f59e0b33; padding: 4px 8px; border-radius: 4px; margin-bottom: 7px; }
+
+/* Modal */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.78); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 20px; }
+.modal { background: var(--surface); border: 1px solid var(--border2); border-radius: 8px; max-width: 470px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.65); }
+.modal-hdr { display: flex; align-items: center; gap: 9px; padding: 16px 18px 12px; border-bottom: 1px solid var(--border); }
+.modal-icon { font-size: 19px; }
+.modal-hdr h2 { font-family: var(--mono); font-size: 14px; font-weight: 600; }
+.modal-body { padding: 16px 18px; font-size: 13px; line-height: 1.7; }
+.modal-body p { margin-bottom: 9px; }
+.modal-body ul { margin: 5px 0 9px 16px; }
+.modal-body li { margin-bottom: 3px; color: var(--muted); }
+.modal-body code { font-family: var(--mono); background: var(--surface2); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+.modal-confirm { background: var(--surface2); border: 1px solid var(--border2); padding: 9px 11px; border-radius: 5px; color: var(--text); font-style: italic; font-size: 12px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 9px; padding: 12px 18px; border-top: 1px solid var(--border); }
+.btn-cancel { background: none; border: 1px solid var(--border2); color: var(--muted); padding: 7px 15px; border-radius: 5px; cursor: pointer; font-size: 13px; transition: all .15s; }
+.btn-cancel:hover { color: var(--text); }
+.btn-auth { background: var(--accent); border: none; color: white; padding: 7px 15px; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: 500; transition: background .15s; }
+.btn-auth:hover { background: var(--accent2); }
+
+/* ── Table panel ── */
+#table-panel { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+#table-controls {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 10px; border-bottom: 1px solid var(--border);
+  background: var(--surface); flex-shrink: 0;
+}
+.tab-btn { background: none; border: 1px solid var(--border); color: var(--muted); padding: 3px 11px; border-radius: 4px; cursor: pointer; font-size: 11px; font-family: var(--mono); transition: all .15s; }
+.tab-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+.tab-btn:hover:not(.active) { color: var(--text); border-color: var(--border2); }
+#filter-input {
+  flex: 1; min-width: 140px; background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); padding: 4px 9px; border-radius: 4px;
+  font-family: var(--mono); font-size: 11px; outline: none;
+}
+#filter-input:focus { border-color: var(--accent); }
+#filter-input::placeholder { color: var(--muted); }
+#zone-select { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 4px 7px; border-radius: 4px; font-family: var(--mono); font-size: 11px; cursor: pointer; outline: none; }
+#rec-count { font-family: var(--mono); font-size: 10px; color: var(--muted); white-space: nowrap; }
+.table-scroll { flex: 1; overflow-y: auto; }
+#incidents-table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 11px; }
+#incidents-table thead { position: sticky; top: 0; z-index: 5; }
+#incidents-table th {
+  background: var(--surface2); color: var(--muted); padding: 7px 8px;
+  text-align: left; font-weight: 500; border-bottom: 1px solid var(--border);
+  letter-spacing: .04em; font-size: 9px; text-transform: uppercase; white-space: nowrap; cursor: pointer; user-select: none;
+}
+#incidents-table th:hover { color: var(--text); }
+.sort-arrow { color: var(--accent); }
+#incidents-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.t-row { cursor: pointer; transition: background .1s; }
+.t-row:hover { background: var(--surface); }
+.t-row.selected { background: #1d4ed820; }
+.td-date { color: var(--text); }
+.td-clk  { color: var(--muted); font-size: 10px; }
+.td-num  { color: var(--muted); }
+.type-pill { padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 500; white-space: nowrap; }
+.td-loc  { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zone-badge { padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+.prio-yes { color: var(--danger); font-weight: 700; }
+.prio-no  { color: var(--muted); }
+.td-empty { text-align: center; color: var(--muted); padding: 28px; font-style: italic; }
+
+/* ── Footer ── */
+#footer {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 5px;
+  padding: 6px 18px; background: var(--surface); border-top: 1px solid var(--border);
+  font-family: var(--mono); font-size: 10px; color: var(--muted); flex-shrink: 0;
+}
+#footer a { color: var(--accent); text-decoration: none; }
+#footer a:hover { text-decoration: underline; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div id="header">
+  <div class="logo">
+    <span class="logo-mark">◈</span>
+    <div>
+      <div class="logo-title">Fullerton Watch Commander Log</div>
+      <div class="logo-sub">Public ArcGIS endpoint · live refresh every 30s</div>
+    </div>
+  </div>
+  <div class="live-badge">
+    <span class="live-dot dot-idle" id="live-dot"></span>
+    <span class="live-label" id="live-label">Connecting…</span>
+    <span class="live-age" id="live-age"></span>
+    <span class="new-badge" id="new-badge"></span>
+    <button class="refresh-btn" onclick="refresh()" title="Refresh now">↺</button>
+  </div>
+</div>
+
+<!-- Error banner -->
+<div id="error-banner"></div>
+
+<!-- Stats bar -->
+<div id="stats-bar">
+  <div class="stat-block">
+    <span class="stat-num" id="s-total">—</span>
+    <span class="stat-lbl">Records</span>
+  </div>
+  <div class="stat-block">
+    <span class="stat-num danger" id="s-prio">—</span>
+    <span class="stat-lbl">Priority</span>
+  </div>
+  <div class="zone-chips" id="zone-chips"></div>
+  <div class="type-chips" id="type-chips"></div>
+</div>
+
+<!-- Main -->
+<div id="main">
+
+  <!-- Map -->
+  <div id="map-wrap">
+    <div id="map"></div>
+    <div id="map-legend">
+      <div class="leg-title">Zone</div>
+      <div class="leg-row"><span class="leg-dot" style="background:#3182ce"></span>Zone 1</div>
+      <div class="leg-row"><span class="leg-dot" style="background:#38a169"></span>Zone 2</div>
+      <div class="leg-row"><span class="leg-dot" style="background:#d69e2e"></span>Zone 3</div>
+    </div>
+  </div>
+
+  <!-- Right panel -->
+  <div id="right">
+
+    <!-- Detail card -->
+    <div id="incident-card">
+      <div class="card-hdr" id="card-hdr">
+        <div class="card-top">
+          <span class="card-type" id="c-type"></span>
+          <span class="card-num"  id="c-num"></span>
+          <span class="card-prio" id="c-prio">PRIORITY</span>
+          <button class="card-close" onclick="closeCard()">✕</button>
+        </div>
+        <div class="card-time" id="c-time"></div>
+      </div>
+      <div class="card-body">
+        <div class="card-row"><span class="card-key">Location</span><span class="card-val" id="c-loc"></span></div>
+        <div class="card-row"><span class="card-key">Zone</span><span class="card-val" id="c-zone"></span></div>
+        <div class="card-row"><span class="card-key">Commander</span><span class="card-val" id="c-cmd"></span></div>
+        <div class="card-row" id="c-notif-row" style="display:none"><span class="card-key">Notified</span><span class="card-val card-notif" id="c-notif"></span></div>
+        <div class="card-row" id="c-veh-row" style="display:none"><span class="card-key">Vehicle</span><span class="card-val card-veh" id="c-veh"></span></div>
+        <div class="remarks-section">
+          <div class="remarks-lbl">Remarks<span class="remarks-note">· CPRA §6254 / PC §293 redaction gate</span></div>
+          <div id="remarks-body"></div>
+        </div>
+      </div>
+      <div class="card-footer">Source: gis.cityoffullerton.com · ArcGIS REST · No auth required</div>
+    </div>
+
+    <!-- Table -->
+    <div id="table-panel">
+      <div id="table-controls">
+        <button class="tab-btn active" id="tab-live" onclick="setTab('live')">Live window</button>
+        <input id="filter-input" placeholder="Search…" oninput="applyFilters()"/>
+        <select id="zone-select" onchange="applyFilters()">
+          <option value="">All zones</option>
+          <option>1</option><option>2</option><option>3</option>
+        </select>
+        <span id="rec-count"></span>
+      </div>
+      <div class="table-scroll">
+        <table id="incidents-table">
+          <thead>
+            <tr>
+              <th onclick="setSort('incident_date_and_time')">Date/Time<span class="sort-arrow" id="sh-date"></span></th>
+              <th onclick="setSort('incident_number')">Incident #<span class="sort-arrow" id="sh-num"></span></th>
+              <th onclick="setSort('call_type')">Type<span class="sort-arrow" id="sh-type"></span></th>
+              <th>Location</th>
+              <th onclick="setSort('police_zone')">Zone<span class="sort-arrow" id="sh-zone"></span></th>
+              <th onclick="setSort('watch_commander')">Commander<span class="sort-arrow" id="sh-cmd"></span></th>
+              <th onclick="setSort('priority_notification')">Prio<span class="sort-arrow" id="sh-prio"></span></th>
+            </tr>
+          </thead>
+          <tbody id="tbl-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Footer -->
+<div id="footer">
+  <div>
+    Data: <a href="https://gis.cityoffullerton.com/arcgis/rest/services/Hosted/WatchCommanderLogs/FeatureServer/0" target="_blank">gis.cityoffullerton.com</a>
+    · Public ArcGIS REST · No authentication required
+    · <a href="https://github.com/YOUR_USERNAME/fullerton-wcl-live" target="_blank">GitHub</a>
+  </div>
+  <div>
+    Remarks gated · CPRA §6254 / PC §293 redaction review required ·
+    <a href="https://firstamendmentcoalition.org/handbook/police-transparency-handbook/" target="_blank">CA Police Transparency Law</a>
+  </div>
+</div>
+
+<!-- Remarks gate modal -->
+<div class="modal-overlay" id="gate-modal" style="display:none" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-hdr">
+      <span class="modal-icon">⚠</span>
+      <h2>Redaction Review Authorization</h2>
+    </div>
+    <div class="modal-body">
+      <p>The <strong>Remarks</strong> field contains the full narrative text of incident <code id="gate-num"></code>, as entered by the watch commander.</p>
+      <p>This field may contain information California law requires to be reviewed and redacted before public release, including:</p>
+      <ul>
+        <li>Victim identifying information in sexual assault cases (PC §293)</li>
+        <li>Juvenile identifying information</li>
+        <li>Active investigation details (CPRA §6254)</li>
+        <li>Witness identifying information</li>
+      </ul>
+      <p>This data is published by the City of Fullerton at a public ArcGIS endpoint without redaction review. This viewer surfaces the misconfiguration for responsible disclosure and redaction compliance.</p>
+      <p class="modal-confirm">By proceeding, you confirm you are authorized to view this field for purposes of redaction review, security research, or journalism.</p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-auth" onclick="authorizeRemarks()">I confirm — show remarks</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ── Constants ──────────────────────────────────────────────────────────
+const ARCGIS = 'https://gis.cityoffullerton.com/arcgis/rest/services/Hosted/WatchCommanderLogs/FeatureServer/0';
+const POLL_MS = 30000;
+
+const ZONE_COLORS = { '1':'#3182ce', '2':'#38a169', '3':'#d69e2e' };
+
+const CALL_MAP = {
+  '211 PC':           {label:'Robbery',           color:'#e53e3e'},
+  '459 PC':           {label:'Burglary',           color:'#dd6b20'},
+  '261 PC':           {label:'Sexual Assault',     color:'#805ad5'},
+  '242 PC':           {label:'Battery',            color:'#d69e2e'},
+  '243 PC':           {label:'Battery on Officer', color:'#e53e3e'},
+  '245 PC':           {label:'Assault w/ Weapon',  color:'#e53e3e'},
+  '487 PC':           {label:'Grand Theft',        color:'#dd6b20'},
+  '594 PC':           {label:'Vandalism',          color:'#718096'},
+  '927D':             {label:'Death Investigation',color:'#a0aec0'},
+  'Domestic Violence':{label:'Domestic Violence',  color:'#9b2c2c'},
+  'Other':            {label:'Other',              color:'#4a5568'},
+};
+
+function callInfo(raw) {
+  if (!raw) return {label:'Unknown', color:'#718096'};
+  if (CALL_MAP[raw]) return CALL_MAP[raw];
+  const k = Object.keys(CALL_MAP).find(k => raw.toUpperCase().includes(k.toUpperCase()));
+  return k ? CALL_MAP[k] : {label: raw, color:'#4a5568'};
+}
+
+function fmtDT(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  return d.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
+}
+function fmtDate(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+}
+function fmtTime(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:false});
+}
+function timeAgo(ts) {
+  if (!ts) return '';
+  const m = Math.floor((Date.now()-ts)/60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return m+'m ago';
+  const h = Math.floor(m/60);
+  if (h < 24) return h+'h ago';
+  return Math.floor(h/24)+'d ago';
+}
+
+// ── State ──────────────────────────────────────────────────────────────
+let allRecords = [];
+let selectedId = null;
+let sortKey = 'incident_date_and_time';
+let sortDir = 'desc';
+let knownIds = new Set();
+let lastFetch = null;
+let remarksAuthorized = sessionStorage.getItem('wcl_auth') === 'true';
+let gateTarget = null; // {id, remarks, num}
+let pollTimer = null;
+
+// ── Map setup ──────────────────────────────────────────────────────────
+const map = L.map('map', { center: [33.8704,-117.9242], zoom: 13 });
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution:'© OpenStreetMap © CARTO', maxZoom:19
+}).addTo(map);
+const markerLayer = L.layerGroup().addTo(map);
+const markerMap = {};
+
+// ── Fetch ──────────────────────────────────────────────────────────────
+async function fetchLive() {
+  const params = new URLSearchParams({
+    where:'1=1', outFields:'*', returnGeometry:'true',
+    resultRecordCount:'2000', orderByFields:'incident_date_and_time DESC', f:'json'
+  });
+  const res = await fetch(`${ARCGIS}/query?${params}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return (data.features||[]).map(f => ({
+    ...f.attributes,
+    lat: f.geometry?.y ?? null,
+    lon: f.geometry?.x ?? null,
+  }));
+}
+
+async function poll() {
+  setStatus('load');
+  try {
+    const recs = await fetchLive();
+    const fresh = recs.filter(r => !knownIds.has(r.objectid));
+    fresh.forEach(r => knownIds.add(r.objectid));
+
+    allRecords = recs;
+    lastFetch = Date.now();
+    setStatus('live');
+    hideError();
+
+    if (fresh.length > 0 && knownIds.size > fresh.length) {
+      const nb = document.getElementById('new-badge');
+      nb.textContent = `+${fresh.length} new`;
+      nb.style.display = 'inline';
+      setTimeout(() => nb.style.display='none', 8000);
+    }
+
+    renderStats();
+    renderMarkers();
+    renderTable();
+
+  } catch(e) {
+    setStatus('err');
+    showError('Cannot reach ArcGIS endpoint: ' + e.message);
+  }
+}
+
+function refresh() {
+  clearInterval(pollTimer);
+  poll();
+  pollTimer = setInterval(poll, POLL_MS);
+}
+
+// ── Status ─────────────────────────────────────────────────────────────
+function setStatus(s) {
+  const dot = document.getElementById('live-dot');
+  const lbl = document.getElementById('live-label');
+  dot.className = 'live-dot ' + ({live:'dot-live',load:'dot-load',err:'dot-err',idle:'dot-idle'}[s]||'dot-idle');
+  lbl.textContent = {live:'Live',load:'Refreshing…',err:'Error',idle:'Connecting…'}[s]||s;
+}
+function showError(m) {
+  const b = document.getElementById('error-banner');
+  b.textContent = '⚠ '+m; b.style.display='block';
+}
+function hideError() {
+  document.getElementById('error-banner').style.display='none';
+}
+
+// Update timeAgo every 10s
+setInterval(() => {
+  if (lastFetch) document.getElementById('live-age').textContent = '· '+timeAgo(lastFetch);
+}, 10000);
+
+// ── Stats ──────────────────────────────────────────────────────────────
+function renderStats() {
+  const recs = allRecords;
+  document.getElementById('s-total').textContent = recs.length;
+  document.getElementById('s-prio').textContent = recs.filter(r=>r.priority_notification==='Y').length;
+
+  const byZone = {};
+  const byType = {};
+  recs.forEach(r => {
+    const z = r.police_zone||'?';
+    byZone[z] = (byZone[z]||0)+1;
+    const {label} = callInfo(r.call_type);
+    byType[label] = (byType[label]||0)+1;
+  });
+
+  const zc = document.getElementById('zone-chips');
+  zc.innerHTML = Object.entries(byZone).sort().map(([z,n])=>`
+    <div class="zone-chip" style="border-color:${ZONE_COLORS[z]||'#718096'}">
+      <span class="z-dot" style="background:${ZONE_COLORS[z]||'#718096'}"></span>Zone ${z}: ${n}
+    </div>`).join('');
+
+  const tc = document.getElementById('type-chips');
+  tc.innerHTML = Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,4)
+    .map(([l,n])=>`<div class="type-chip"><span class="tc-lbl">${l}</span><span class="tc-cnt">${n}</span></div>`).join('');
+}
+
+// ── Markers ────────────────────────────────────────────────────────────
+function renderMarkers() {
+  markerLayer.clearLayers();
+  Object.keys(markerMap).forEach(k => delete markerMap[k]);
+
+  allRecords.forEach(r => {
+    if (!r.lat || !r.lon) return;
+    const {color,label} = callInfo(r.call_type);
+    const zc = ZONE_COLORS[r.police_zone]||'#718096';
+
+    const icon = L.divIcon({
+      className:'',
+      html:`<div style="background:${color};border:2px solid ${zc};width:13px;height:13px;border-radius:50%;box-shadow:0 0 5px ${color}88;cursor:pointer"></div>`,
+      iconSize:[13,13],iconAnchor:[6,6]
+    });
+
+    const m = L.marker([r.lat,r.lon],{icon})
+      .bindPopup(`<div class="map-popup">
+        <div class="pp-type" style="color:${color}">${label}</div>
+        <div class="pp-num">${r.incident_number||''}</div>
+        <div class="pp-loc">${r.location||''}</div>
+        <div class="pp-time">${fmtDT(r.incident_date_and_time)}</div>
+        <div class="pp-cmd">Cmd: ${r.watch_commander||'—'}</div>
+        <div class="pp-zone" style="color:${zc}">Zone ${r.police_zone||'?'}</div>
+      </div>`, {maxWidth:250})
+      .on('click',()=>selectRecord(r.objectid));
+
+    m.addTo(markerLayer);
+    markerMap[r.objectid] = m;
+  });
+}
+
+// ── Table ──────────────────────────────────────────────────────────────
+function setSort(key) {
+  const arrows = {
+    'incident_date_and_time':'sh-date','incident_number':'sh-num',
+    'call_type':'sh-type','police_zone':'sh-zone',
+    'watch_commander':'sh-cmd','priority_notification':'sh-prio'
+  };
+  if (sortKey===key) sortDir = sortDir==='asc'?'desc':'asc';
+  else { sortKey=key; sortDir='desc'; }
+  Object.values(arrows).forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='';});
+  const arrow = document.getElementById(arrows[key]);
+  if (arrow) arrow.textContent = sortDir==='asc'?' ▲':' ▼';
+  renderTable();
+}
+
+function applyFilters() { renderTable(); }
+
+function renderTable() {
+  const q = document.getElementById('filter-input').value.toLowerCase();
+  const zf = document.getElementById('zone-select').value;
+
+  let data = [...allRecords];
+
+  if (q) data = data.filter(r =>
+    (r.call_type||'').toLowerCase().includes(q) ||
+    (r.location||'').toLowerCase().includes(q) ||
+    (r.incident_number||'').toLowerCase().includes(q) ||
+    (r.watch_commander||'').toLowerCase().includes(q)
+  );
+  if (zf) data = data.filter(r => String(r.police_zone)===zf);
+
+  data.sort((a,b)=>{
+    const av=a[sortKey]??'', bv=b[sortKey]??'';
+    const c = av<bv?-1:av>bv?1:0;
+    return sortDir==='asc'?c:-c;
+  });
+
+  document.getElementById('rec-count').textContent = data.length+' record'+(data.length!==1?'s':'');
+
+  const tbody = document.getElementById('tbl-body');
+  if (data.length===0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="td-empty">No records match</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = data.map(r => {
+    const {label,color} = callInfo(r.call_type);
+    const zc = ZONE_COLORS[r.police_zone]||'#718096';
+    const sel = r.objectid===selectedId ? 'selected':'';
+    return `<tr class="t-row ${sel}" onclick="selectRecord(${r.objectid})">
+      <td><div class="td-date">${fmtDate(r.incident_date_and_time)}</div><div class="td-clk">${fmtTime(r.incident_date_and_time)}</div></td>
+      <td class="td-num">${r.incident_number||'—'}</td>
+      <td><span class="type-pill" style="background:${color}22;color:${color};border:1px solid ${color}44">${label}</span></td>
+      <td class="td-loc">${r.location||'—'}</td>
+      <td><span class="zone-badge" style="color:${zc};border:1px solid ${zc}">${r.police_zone||'?'}</span></td>
+      <td>${r.watch_commander||'—'}</td>
+      <td>${r.priority_notification==='Y'?'<span class="prio-yes">⚑</span>':'<span class="prio-no">—</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Card ───────────────────────────────────────────────────────────────
+function selectRecord(id) {
+  selectedId = (selectedId===id) ? null : id;
+  renderTable();
+
+  if (!selectedId) { closeCard(); return; }
+
+  const r = allRecords.find(x=>x.objectid===id);
+  if (!r) return;
+
+  const {label,color} = callInfo(r.call_type);
+  const zc = ZONE_COLORS[r.police_zone]||'#718096';
+
+  document.getElementById('card-hdr').style.borderLeftColor = color;
+  document.getElementById('c-type').textContent = label;
+  document.getElementById('c-type').style.color = color;
+  document.getElementById('c-num').textContent = r.incident_number||'';
+  const prio = document.getElementById('c-prio');
+  prio.style.display = r.priority_notification==='Y'?'inline':'none';
+  document.getElementById('c-time').textContent = fmtDT(r.incident_date_and_time);
+  document.getElementById('c-loc').textContent = r.location||'—';
+  document.getElementById('c-zone').textContent = `Zone ${r.police_zone||'?'}`;
+  document.getElementById('c-zone').style.color = zc;
+  document.getElementById('c-cmd').textContent = r.watch_commander||'—';
+
+  const notifRow = document.getElementById('c-notif-row');
+  const notif = r.notifications;
+  if (notif && notif!=='[]' && notif!=='') {
+    document.getElementById('c-notif').textContent = Array.isArray(notif)?notif.join(', '):notif;
+    notifRow.style.display='flex';
+  } else notifRow.style.display='none';
+
+  const vehRow = document.getElementById('c-veh-row');
+  if (r.suspect_vehicle_description) {
+    document.getElementById('c-veh').textContent = r.suspect_vehicle_description;
+    vehRow.style.display='flex';
+  } else vehRow.style.display='none';
+
+  // Remarks gate
+  renderRemarksGate(r);
+
+  document.getElementById('incident-card').style.display='block';
+
+  // Pan map
+  if (r.lat && r.lon && markerMap[id]) {
+    map.panTo([r.lat,r.lon],{animate:true,duration:0.4});
+    markerMap[id].openPopup();
+  }
+}
+
+function renderRemarksGate(r) {
+  const body = document.getElementById('remarks-body');
+  if (!r.remarks) {
+    body.innerHTML = `<span style="color:var(--muted);font-style:italic">No remarks</span>`;
+    return;
+  }
+  if (remarksAuthorized) {
+    body.innerHTML = `<div class="remarks-warn">⚠ Unredacted · contains operational data subject to CPRA review</div>
+      <div class="remarks-text">${escHtml(r.remarks)}</div>`;
+  } else {
+    body.innerHTML = `<button class="gate-btn" onclick="openGate(${r.objectid})">
+      🔒 Authorized access only — click to confirm redaction review
+    </button>`;
+  }
+}
+
+function openGate(id) {
+  const r = allRecords.find(x=>x.objectid===id);
+  if (!r) return;
+  gateTarget = r;
+  document.getElementById('gate-num').textContent = r.incident_number||String(id);
+  document.getElementById('gate-modal').style.display='flex';
+}
+
+function authorizeRemarks() {
+  remarksAuthorized = true;
+  sessionStorage.setItem('wcl_auth','true');
+  document.getElementById('gate-modal').style.display='none';
+  if (gateTarget) renderRemarksGate(gateTarget);
+}
+
+function closeModal(e) {
+  if (!e || e.target===document.getElementById('gate-modal'))
+    document.getElementById('gate-modal').style.display='none';
+}
+
+function closeCard() {
+  document.getElementById('incident-card').style.display='none';
+  selectedId = null;
+  renderTable();
+}
+
+function setTab(t) {
+  // Future: hook up archive API here
+  document.getElementById('tab-live').className = 'tab-btn'+(t==='live'?' active':'');
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Init ───────────────────────────────────────────────────────────────
+document.getElementById('sh-date').textContent = ' ▼'; // default sort indicator
+poll();
+pollTimer = setInterval(poll, POLL_MS);
+</script>
+</body>
+</html>
