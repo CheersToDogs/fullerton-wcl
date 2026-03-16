@@ -2,7 +2,7 @@
 
 Live civic transparency dashboard for the Fullerton Police Department Watch Commander Log.
 
-**Live site**: https://YOUR_USERNAME.github.io/fullerton-wcl
+**Live site**: https://CheerstoDogs.github.io/fullerton-wcl
 
 Data published publicly at `gis.cityoffullerton.com` via ArcGIS Enterprise 11.5 — no authentication required.
 
@@ -27,7 +27,7 @@ The remarks field contains unredacted narrative text that California law require
 ```bash
 # 1. Create a new GitHub repo named fullerton-wcl
 # 2. Clone it
-git clone https://github.com/YOUR_USERNAME/fullerton-wcl
+git clone https://github.com/CheerstoDogs/fullerton-wcl
 cd fullerton-wcl
 
 # 3. Drop index.html in the root
@@ -40,7 +40,7 @@ git push origin main
 
 # 5. Enable GitHub Pages
 # → Repo Settings → Pages → Source: Deploy from branch → Branch: main / (root)
-# Site will be live at https://YOUR_USERNAME.github.io/fullerton-wcl in ~60s
+# Site will be live at https://CheerstoDogs.github.io/fullerton-wcl in ~60s
 ```
 
 That's it. No build step, no Node, no CI/CD needed.
