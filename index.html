@@ -3,737 +3,540 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Fullerton Watch Commander Log</title>
+<title>Fullerton Public Safety Data</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-:root {
-  --bg:       #0d0f14;
-  --surface:  #13161e;
-  --surface2: #1a1e28;
-  --border:   #2a2f3d;
-  --border2:  #363c50;
-  --text:     #e2e8f0;
-  --muted:    #64748b;
-  --accent:   #3b82f6;
-  --accent2:  #1d4ed8;
-  --danger:   #ef4444;
-  --warn:     #f59e0b;
-  --mono:     'IBM Plex Mono', monospace;
-  --sans:     'IBM Plex Sans', system-ui, sans-serif;
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0f14;--surface:#13161e;--surface2:#1a1e28;
+  --border:#2a2f3d;--border2:#363c50;
+  --text:#e2e8f0;--muted:#64748b;
+  --accent:#3b82f6;--accent2:#1d4ed8;
+  --danger:#ef4444;--warn:#f59e0b;--ok:#22c55e;
+  --wcl:#ef4444;--cfs:#eab308;--trans:#3b82f6;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',system-ui,sans-serif;
 }
+body{background:var(--bg);color:var(--text);font-family:var(--sans);height:100vh;display:flex;flex-direction:column;overflow:hidden}
 
-body { background: var(--bg); color: var(--text); font-family: var(--sans); overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+#hdr{display:flex;align-items:center;justify-content:space-between;padding:9px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;gap:12px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:9px}
+.logo-mark{font-size:20px;color:var(--accent)}
+.logo-title{font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:.02em}
+.logo-sub{font-size:10px;color:var(--muted);margin-top:1px;font-family:var(--mono)}
+.hdr-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.layers{display:flex;gap:5px}
+.layer-btn{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:4px;border:1px solid;font-family:var(--mono);font-size:11px;cursor:pointer;transition:all .15s;user-select:none;font-weight:500}
+.layer-btn.wcl{border-color:var(--wcl);color:var(--wcl);background:#ef444415}
+.layer-btn.cfs{border-color:var(--cfs);color:var(--cfs);background:#eab30815}
+.layer-btn.trans{border-color:var(--trans);color:var(--trans);background:#3b82f615}
+.layer-btn.off{opacity:.3;filter:grayscale(.9)}
+.ldot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.live-badge{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px}
+.live-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.dot-live{background:var(--ok);box-shadow:0 0 5px #22c55e88;animation:pulse 2s infinite}
+.dot-load{background:var(--warn);animation:pulse .7s infinite}
+.dot-err{background:var(--danger)}.dot-idle{background:var(--muted)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.live-lbl{font-weight:500}.live-age{color:var(--muted)}
+.refresh-btn{background:none;border:1px solid var(--border2);color:var(--muted);padding:2px 7px;border-radius:4px;cursor:pointer;font-size:13px;transition:all .15s}
+.refresh-btn:hover{color:var(--text);border-color:var(--accent)}
 
-/* ── Header ── */
-#header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 18px; background: var(--surface);
-  border-bottom: 1px solid var(--border); flex-shrink: 0;
-}
-.logo { display: flex; align-items: center; gap: 10px; }
-.logo-mark { font-size: 22px; color: var(--accent); }
-.logo-title { font-family: var(--mono); font-size: 14px; font-weight: 600; letter-spacing: 0.02em; }
-.logo-sub { font-size: 10px; color: var(--muted); margin-top: 2px; font-family: var(--mono); }
-.live-badge { display: flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 12px; }
-.live-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.dot-live   { background: #22c55e; box-shadow: 0 0 6px #22c55e88; animation: pulse 2s infinite; }
-.dot-load   { background: #f59e0b; animation: pulse 0.7s infinite; }
-.dot-err    { background: var(--danger); }
-.dot-idle   { background: var(--muted); }
-@keyframes pulse { 0%,100%{opacity:1}50%{opacity:.35} }
-.live-label { font-weight: 500; }
-.live-age   { color: var(--muted); }
-.new-badge  { background: #22c55e22; color: #22c55e; border: 1px solid #22c55e44; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; display: none; }
-.refresh-btn { background: none; border: 1px solid var(--border2); color: var(--muted); padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 14px; transition: all .15s; }
-.refresh-btn:hover { color: var(--text); border-color: var(--accent); }
+#stats{display:flex;align-items:center;gap:12px;padding:7px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;font-family:var(--mono);font-size:11px;flex-wrap:wrap}
+.stat{display:flex;align-items:center;gap:6px}
+.stat-num{font-size:18px;font-weight:600;line-height:1}
+.stat-lbl{color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.05em;line-height:1.4}
+.sdiv{width:1px;height:22px;background:var(--border);flex-shrink:0}
 
-/* ── Error banner ── */
-#error-banner { background: #7f1d1d; color: #fca5a5; padding: 6px 18px; font-size: 12px; font-family: var(--mono); display: none; flex-shrink: 0; }
+#prog{display:none;flex-shrink:0}
+#prog-bar{height:3px;background:linear-gradient(90deg,var(--cfs),var(--trans));transition:width .4s;width:0%}
+#prog-txt{font-family:var(--mono);font-size:10px;color:var(--muted);padding:3px 16px;background:var(--surface2);text-align:center}
 
-/* ── Stats bar ── */
-#stats-bar {
-  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-  padding: 8px 18px; background: var(--surface);
-  border-bottom: 1px solid var(--border); flex-shrink: 0;
-  font-family: var(--mono); font-size: 11px;
-}
-.stat-block { display: flex; flex-direction: column; align-items: center; min-width: 55px; }
-.stat-num   { font-size: 20px; font-weight: 600; color: var(--accent); line-height: 1; }
-.stat-num.danger { color: var(--danger); }
-.stat-lbl   { font-size: 9px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: .06em; }
-.zone-chips { display: flex; gap: 6px; }
-.zone-chip  { display: flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 4px; border: 1px solid; font-size: 11px; }
-.z-dot      { width: 7px; height: 7px; border-radius: 50%; }
-.type-chips { display: flex; gap: 5px; flex-wrap: wrap; }
-.type-chip  { display: flex; align-items: center; gap: 5px; padding: 2px 7px; border-radius: 4px; background: var(--surface2); border: 1px solid var(--border); }
-.tc-lbl     { color: var(--muted); }
-.tc-cnt     { color: var(--text); font-weight: 600; }
+#main{display:grid;grid-template-columns:1fr 400px;flex:1;overflow:hidden}
+#map-wrap{position:relative;overflow:hidden}
+#map{height:100%;width:100%}
+#map-legend{position:absolute;bottom:16px;left:10px;z-index:1000;background:#13161eee;border:1px solid var(--border);border-radius:5px;padding:8px 11px;font-family:var(--mono);font-size:11px;backdrop-filter:blur(4px)}
+.leg-ttl{color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.leg-row{display:flex;align-items:center;gap:6px;color:var(--text);margin-top:3px}
+.leg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 
-/* ── Main layout ── */
-#main { display: grid; grid-template-columns: 1fr 420px; flex: 1; overflow: hidden; }
+.leaflet-popup-content-wrapper{background:#1a1e28;border:1px solid #2a2f3d;color:#e2e8f0;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.6)}
+.leaflet-popup-tip{background:#1a1e28}
+.leaflet-popup-content{margin:9px 12px}
+.pp{font-family:var(--mono);font-size:12px;line-height:1.65;min-width:170px}
+.pp-badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:600;margin-bottom:4px}
+.pp-loc{font-weight:500;margin:2px 0}
+.pp-time{color:var(--muted);font-size:11px}
+.pp-meta{color:var(--muted);font-size:11px;margin-top:2px}
+.pp-ok{color:var(--ok);font-size:11px}
 
-/* ── Map ── */
-#map-wrap { position: relative; overflow: hidden; }
-#map      { height: 100%; width: 100%; }
-#map-legend {
-  position: absolute; bottom: 18px; left: 10px; z-index: 1000;
-  background: var(--surface)ee; border: 1px solid var(--border);
-  padding: 7px 11px; border-radius: 6px; font-family: var(--mono); font-size: 11px;
-  backdrop-filter: blur(4px);
-}
-.leg-title { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
-.leg-row   { display: flex; align-items: center; gap: 5px; color: var(--text); margin-top: 3px; }
-.leg-dot   { width: 8px; height: 8px; border-radius: 50%; }
+#right{display:flex;flex-direction:column;overflow:hidden;border-left:1px solid var(--border)}
+#card{display:none;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;max-height:48%;overflow-y:auto}
+.card-hdr{padding:11px 13px 8px;border-bottom:1px solid var(--border);border-left:3px solid transparent}
+.card-top{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.card-type{font-family:var(--mono);font-weight:600;font-size:13px}
+.card-num{font-family:var(--mono);color:var(--muted);font-size:11px;flex:1}
+.card-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;margin-left:auto;padding:1px 3px}
+.card-close:hover{color:var(--text)}
+.card-sub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px}
+.card-body{padding:9px 13px}
+.cr{display:flex;gap:9px;margin-bottom:6px}
+.ck{font-family:var(--mono);font-size:9px;color:var(--muted);width:72px;flex-shrink:0;padding-top:1px;text-transform:uppercase;letter-spacing:.05em}
+.cv{font-size:12px;color:var(--text)}
+.cv-warn{color:var(--warn)}
+.rem-sec{margin-top:9px;padding-top:9px;border-top:1px solid var(--border)}
+.rem-lbl{font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.rem-note{color:var(--warn)}
+.card-foot{padding:5px 13px;border-top:1px solid var(--border);background:var(--surface2);font-family:var(--mono);font-size:9px;color:var(--muted)}
+.gate-btn{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border2);color:var(--muted);padding:6px 10px;border-radius:4px;cursor:pointer;font-size:11px;font-family:var(--mono);width:100%;text-align:left;transition:all .15s}
+.gate-btn:hover{border-color:var(--accent);color:var(--text)}
+.rem-txt{font-size:12px;line-height:1.65;color:var(--text)}
+.rem-warn{font-family:var(--mono);font-size:9px;color:var(--warn);background:#451a0322;border:1px solid #f59e0b33;padding:3px 7px;border-radius:3px;margin-bottom:6px}
 
-/* Leaflet popup */
-.map-popup { font-family: var(--mono); font-size: 12px; line-height: 1.6; min-width: 170px; }
-.pp-type   { font-weight: 600; font-size: 13px; }
-.pp-num    { color: #64748b; font-size: 11px; }
-.pp-loc    { font-weight: 500; margin-top: 2px; }
-.pp-time   { color: #64748b; font-size: 11px; }
-.pp-cmd    { margin-top: 2px; }
-.pp-zone   { font-size: 11px; margin-top: 1px; }
-.leaflet-popup-content-wrapper { background: #1a1e28; border: 1px solid #2a2f3d; color: #e2e8f0; border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.6); }
-.leaflet-popup-tip { background: #1a1e28; }
-.leaflet-popup-content { margin: 10px 14px; }
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:8px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.7)}
+.mhd{display:flex;align-items:center;gap:8px;padding:13px 16px 10px;border-bottom:1px solid var(--border)}
+.mhd h2{font-family:var(--mono);font-size:13px;font-weight:600}
+.mbd{padding:13px 16px;font-size:12px;line-height:1.7}
+.mbd p{margin-bottom:8px}.mbd ul{margin:4px 0 8px 15px}.mbd li{margin-bottom:3px;color:var(--muted)}
+.mbd code{font-family:var(--mono);background:var(--surface2);padding:1px 4px;border-radius:3px;font-size:11px}
+.mconfirm{background:var(--surface2);border:1px solid var(--border2);padding:8px 10px;border-radius:4px;color:var(--text);font-style:italic;font-size:11px}
+.mact{display:flex;justify-content:flex-end;gap:8px;padding:10px 16px;border-top:1px solid var(--border)}
+.btn-x{background:none;border:1px solid var(--border2);color:var(--muted);padding:5px 12px;border-radius:4px;cursor:pointer;font-size:12px;transition:all .15s}
+.btn-x:hover{color:var(--text)}
+.btn-ok{background:var(--accent);border:none;color:#fff;padding:5px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:500;transition:background .15s}
+.btn-ok:hover{background:var(--accent2)}
 
-/* ── Right panel ── */
-#right { display: flex; flex-direction: column; overflow: hidden; border-left: 1px solid var(--border); }
+#tbl-panel{display:flex;flex-direction:column;flex:1;overflow:hidden}
+#tbl-ctl{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 9px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
+.tab-btn{background:none;border:1px solid var(--border);color:var(--muted);padding:2px 9px;border-radius:4px;cursor:pointer;font-size:10px;font-family:var(--mono);transition:all .15s;white-space:nowrap}
+.tab-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.tab-btn:hover:not(.active){color:var(--text);border-color:var(--border2)}
+#fi{flex:1;min-width:100px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:3px 8px;border-radius:4px;font-family:var(--mono);font-size:10px;outline:none}
+#fi:focus{border-color:var(--accent)}#fi::placeholder{color:var(--muted)}
+#rct{font-family:var(--mono);font-size:9px;color:var(--muted);white-space:nowrap}
+.ts{flex:1;overflow-y:auto}
+#tbl{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:10px}
+#tbl thead{position:sticky;top:0;z-index:5}
+#tbl th{background:var(--surface2);color:var(--muted);padding:6px 7px;text-align:left;font-weight:500;border-bottom:1px solid var(--border);letter-spacing:.04em;font-size:9px;text-transform:uppercase;white-space:nowrap;cursor:pointer;user-select:none}
+#tbl th:hover{color:var(--text)}
+#tbl td{padding:5px 7px;border-bottom:1px solid var(--border);vertical-align:middle}
+.tr{cursor:pointer;transition:background .1s}.tr:hover{background:var(--surface)}.tr.sel{background:#1d4ed820}
+.tp{padding:1px 6px;border-radius:8px;font-size:9px;font-weight:500;white-space:nowrap}
+.py{color:var(--danger);font-weight:700}
+.td-empty{text-align:center;color:var(--muted);padding:24px;font-style:italic}
+.td-s{max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-/* ── Incident card ── */
-#incident-card {
-  border-bottom: 1px solid var(--border); background: var(--surface);
-  flex-shrink: 0; max-height: 48%; overflow-y: auto; display: none;
-}
-.card-hdr { padding: 12px 14px 8px; border-bottom: 1px solid var(--border); border-left: 3px solid transparent; }
-.card-top { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
-.card-type { font-family: var(--mono); font-weight: 600; font-size: 14px; }
-.card-num  { font-family: var(--mono); color: var(--muted); font-size: 12px; flex: 1; }
-.card-prio { background: #7f1d1d; color: #fca5a5; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 700; letter-spacing: .06em; display: none; }
-.card-close { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 2px 4px; margin-left: auto; }
-.card-close:hover { color: var(--text); }
-.card-time { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 3px; }
-.card-body { padding: 10px 14px; }
-.card-row  { display: flex; gap: 10px; margin-bottom: 7px; }
-.card-key  { font-family: var(--mono); font-size: 10px; color: var(--muted); width: 78px; flex-shrink: 0; padding-top: 1px; text-transform: uppercase; letter-spacing: .05em; }
-.card-val  { font-size: 13px; color: var(--text); }
-.card-notif { color: var(--warn); }
-.card-veh   { font-family: var(--mono); font-size: 12px; color: var(--warn); }
-.remarks-section { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
-.remarks-lbl { font-family: var(--mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
-.remarks-note { color: var(--warn); font-size: 10px; }
-.card-footer { padding: 6px 14px; border-top: 1px solid var(--border); background: var(--surface2); font-family: var(--mono); font-size: 10px; color: var(--muted); }
-
-/* ── Remarks gate ── */
-.gate-btn {
-  display: flex; align-items: center; gap: 7px;
-  background: var(--surface2); border: 1px solid var(--border2);
-  color: var(--muted); padding: 7px 11px; border-radius: 5px;
-  cursor: pointer; font-size: 12px; font-family: var(--mono);
-  width: 100%; text-align: left; transition: all .15s;
-}
-.gate-btn:hover { border-color: var(--accent); color: var(--text); }
-.remarks-text { font-size: 13px; line-height: 1.65; color: var(--text); }
-.remarks-warn { font-family: var(--mono); font-size: 10px; color: var(--warn); background: #451a0322; border: 1px solid #f59e0b33; padding: 4px 8px; border-radius: 4px; margin-bottom: 7px; }
-
-/* Modal */
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.78); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 20px; }
-.modal { background: var(--surface); border: 1px solid var(--border2); border-radius: 8px; max-width: 470px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.65); }
-.modal-hdr { display: flex; align-items: center; gap: 9px; padding: 16px 18px 12px; border-bottom: 1px solid var(--border); }
-.modal-icon { font-size: 19px; }
-.modal-hdr h2 { font-family: var(--mono); font-size: 14px; font-weight: 600; }
-.modal-body { padding: 16px 18px; font-size: 13px; line-height: 1.7; }
-.modal-body p { margin-bottom: 9px; }
-.modal-body ul { margin: 5px 0 9px 16px; }
-.modal-body li { margin-bottom: 3px; color: var(--muted); }
-.modal-body code { font-family: var(--mono); background: var(--surface2); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
-.modal-confirm { background: var(--surface2); border: 1px solid var(--border2); padding: 9px 11px; border-radius: 5px; color: var(--text); font-style: italic; font-size: 12px; }
-.modal-actions { display: flex; justify-content: flex-end; gap: 9px; padding: 12px 18px; border-top: 1px solid var(--border); }
-.btn-cancel { background: none; border: 1px solid var(--border2); color: var(--muted); padding: 7px 15px; border-radius: 5px; cursor: pointer; font-size: 13px; transition: all .15s; }
-.btn-cancel:hover { color: var(--text); }
-.btn-auth { background: var(--accent); border: none; color: white; padding: 7px 15px; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: 500; transition: background .15s; }
-.btn-auth:hover { background: var(--accent2); }
-
-/* ── Table panel ── */
-#table-panel { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
-#table-controls {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  padding: 8px 10px; border-bottom: 1px solid var(--border);
-  background: var(--surface); flex-shrink: 0;
-}
-.tab-btn { background: none; border: 1px solid var(--border); color: var(--muted); padding: 3px 11px; border-radius: 4px; cursor: pointer; font-size: 11px; font-family: var(--mono); transition: all .15s; }
-.tab-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
-.tab-btn:hover:not(.active) { color: var(--text); border-color: var(--border2); }
-#filter-input {
-  flex: 1; min-width: 140px; background: var(--surface2); border: 1px solid var(--border);
-  color: var(--text); padding: 4px 9px; border-radius: 4px;
-  font-family: var(--mono); font-size: 11px; outline: none;
-}
-#filter-input:focus { border-color: var(--accent); }
-#filter-input::placeholder { color: var(--muted); }
-#zone-select { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 4px 7px; border-radius: 4px; font-family: var(--mono); font-size: 11px; cursor: pointer; outline: none; }
-#rec-count { font-family: var(--mono); font-size: 10px; color: var(--muted); white-space: nowrap; }
-.table-scroll { flex: 1; overflow-y: auto; }
-#incidents-table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 11px; }
-#incidents-table thead { position: sticky; top: 0; z-index: 5; }
-#incidents-table th {
-  background: var(--surface2); color: var(--muted); padding: 7px 8px;
-  text-align: left; font-weight: 500; border-bottom: 1px solid var(--border);
-  letter-spacing: .04em; font-size: 9px; text-transform: uppercase; white-space: nowrap; cursor: pointer; user-select: none;
-}
-#incidents-table th:hover { color: var(--text); }
-.sort-arrow { color: var(--accent); }
-#incidents-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-.t-row { cursor: pointer; transition: background .1s; }
-.t-row:hover { background: var(--surface); }
-.t-row.selected { background: #1d4ed820; }
-.td-date { color: var(--text); }
-.td-clk  { color: var(--muted); font-size: 10px; }
-.td-num  { color: var(--muted); }
-.type-pill { padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 500; white-space: nowrap; }
-.td-loc  { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.zone-badge { padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
-.prio-yes { color: var(--danger); font-weight: 700; }
-.prio-no  { color: var(--muted); }
-.td-empty { text-align: center; color: var(--muted); padding: 28px; font-style: italic; }
-
-/* ── Footer ── */
-#footer {
-  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 5px;
-  padding: 6px 18px; background: var(--surface); border-top: 1px solid var(--border);
-  font-family: var(--mono); font-size: 10px; color: var(--muted); flex-shrink: 0;
-}
-#footer a { color: var(--accent); text-decoration: none; }
-#footer a:hover { text-decoration: underline; }
-
-/* Scrollbar */
-::-webkit-scrollbar { width: 5px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+#foot{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px;padding:5px 16px;background:var(--surface);border-top:1px solid var(--border);font-family:var(--mono);font-size:9px;color:var(--muted);flex-shrink:0}
+#foot a{color:var(--accent);text-decoration:none}#foot a:hover{text-decoration:underline}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 </style>
 </head>
 <body>
 
-<!-- Header -->
-<div id="header">
+<div id="hdr">
   <div class="logo">
     <span class="logo-mark">◈</span>
     <div>
-      <div class="logo-title">Fullerton Watch Commander Log</div>
-      <div class="logo-sub">Public ArcGIS endpoint · live refresh every 30s</div>
+      <div class="logo-title">Fullerton Public Safety Data</div>
+      <div class="logo-sub">3 public ArcGIS endpoints · no authentication · live 30s refresh</div>
     </div>
   </div>
-  <div class="live-badge">
-    <span class="live-dot dot-idle" id="live-dot"></span>
-    <span class="live-label" id="live-label">Connecting…</span>
-    <span class="live-age" id="live-age"></span>
-    <span class="new-badge" id="new-badge"></span>
-    <button class="refresh-btn" onclick="refresh()" title="Refresh now">↺</button>
+  <div class="hdr-right">
+    <div class="layers">
+      <div class="layer-btn wcl" id="btn-wcl" onclick="toggleLayer('wcl')"><span class="ldot" style="background:var(--wcl)"></span>Watch Commander</div>
+      <div class="layer-btn cfs" id="btn-cfs" onclick="toggleLayer('cfs')"><span class="ldot" style="background:var(--cfs)"></span>Calls for Service</div>
+      <div class="layer-btn trans" id="btn-trans" onclick="toggleLayer('trans')"><span class="ldot" style="background:var(--trans)"></span>Transient CFS</div>
+    </div>
+    <div class="live-badge">
+      <span class="live-dot dot-idle" id="live-dot"></span>
+      <span class="live-lbl" id="live-lbl">Connecting…</span>
+      <span class="live-age" id="live-age"></span>
+      <button class="refresh-btn" onclick="refreshWCL()">↺</button>
+    </div>
   </div>
 </div>
 
-<!-- Error banner -->
-<div id="error-banner"></div>
-
-<!-- Stats bar -->
-<div id="stats-bar">
-  <div class="stat-block">
+<div id="stats">
+  <div class="stat">
+    <span class="stat-num" id="s-wcl" style="color:var(--wcl)">—</span>
+    <div><div class="stat-lbl" style="color:var(--wcl)">Watch Cmd</div><div class="stat-lbl" style="font-size:8px">Live · 2026</div></div>
+  </div>
+  <div class="sdiv"></div>
+  <div class="stat">
+    <span class="stat-num" id="s-cfs" style="color:var(--cfs)">—</span>
+    <div><div class="stat-lbl" style="color:var(--cfs)">Calls / Svc</div><div class="stat-lbl" style="font-size:8px">2023–2024</div></div>
+  </div>
+  <div class="sdiv"></div>
+  <div class="stat">
+    <span class="stat-num" id="s-trans" style="color:var(--trans)">—</span>
+    <div><div class="stat-lbl" style="color:var(--trans)">Transient CFS</div><div class="stat-lbl" style="font-size:8px">2020–2023</div></div>
+  </div>
+  <div class="sdiv"></div>
+  <div class="stat">
     <span class="stat-num" id="s-total">—</span>
-    <span class="stat-lbl">Records</span>
+    <div><div class="stat-lbl">Total</div><div class="stat-lbl" style="font-size:8px">Geolocated calls</div></div>
   </div>
-  <div class="stat-block">
-    <span class="stat-num danger" id="s-prio">—</span>
-    <span class="stat-lbl">Priority</span>
-  </div>
-  <div class="zone-chips" id="zone-chips"></div>
-  <div class="type-chips" id="type-chips"></div>
+  <span id="load-status" style="margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--muted)"></span>
 </div>
 
-<!-- Main -->
-<div id="main">
+<div id="prog"><div id="prog-bar"></div><div id="prog-txt"></div></div>
 
-  <!-- Map -->
+<div id="main">
   <div id="map-wrap">
     <div id="map"></div>
     <div id="map-legend">
-      <div class="leg-title">Zone</div>
-      <div class="leg-row"><span class="leg-dot" style="background:#3182ce"></span>Zone 1</div>
-      <div class="leg-row"><span class="leg-dot" style="background:#38a169"></span>Zone 2</div>
-      <div class="leg-row"><span class="leg-dot" style="background:#d69e2e"></span>Zone 3</div>
+      <div class="leg-ttl">Layers</div>
+      <div class="leg-row"><span class="leg-dot" style="background:var(--wcl)"></span>Watch Commander (live 2026)</div>
+      <div class="leg-row"><span class="leg-dot" style="background:var(--cfs)"></span>Calls for Service (2023–2024)</div>
+      <div class="leg-row"><span class="leg-dot" style="background:var(--trans)"></span>Transient CFS (2020–2023)</div>
     </div>
   </div>
-
-  <!-- Right panel -->
   <div id="right">
-
-    <!-- Detail card -->
-    <div id="incident-card">
+    <div id="card">
       <div class="card-hdr" id="card-hdr">
         <div class="card-top">
           <span class="card-type" id="c-type"></span>
-          <span class="card-num"  id="c-num"></span>
-          <span class="card-prio" id="c-prio">PRIORITY</span>
+          <span class="card-num" id="c-num"></span>
+          <span id="c-src-badge"></span>
+          <span id="c-prio" style="display:none;background:#7f1d1d;color:#fca5a5;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700">PRIORITY</span>
           <button class="card-close" onclick="closeCard()">✕</button>
         </div>
-        <div class="card-time" id="c-time"></div>
+        <div class="card-sub" id="c-sub"></div>
       </div>
-      <div class="card-body">
-        <div class="card-row"><span class="card-key">Location</span><span class="card-val" id="c-loc"></span></div>
-        <div class="card-row"><span class="card-key">Zone</span><span class="card-val" id="c-zone"></span></div>
-        <div class="card-row"><span class="card-key">Commander</span><span class="card-val" id="c-cmd"></span></div>
-        <div class="card-row" id="c-notif-row" style="display:none"><span class="card-key">Notified</span><span class="card-val card-notif" id="c-notif"></span></div>
-        <div class="card-row" id="c-veh-row" style="display:none"><span class="card-key">Vehicle</span><span class="card-val card-veh" id="c-veh"></span></div>
-        <div class="remarks-section">
-          <div class="remarks-lbl">Remarks<span class="remarks-note">· CPRA §6254 / PC §293 redaction gate</span></div>
-          <div id="remarks-body"></div>
-        </div>
-      </div>
-      <div class="card-footer">Source: gis.cityoffullerton.com · ArcGIS REST · No auth required</div>
+      <div class="card-body" id="card-body"></div>
+      <div class="card-foot">Source: gis.cityoffullerton.com · ArcGIS REST · No authentication required</div>
     </div>
-
-    <!-- Table -->
-    <div id="table-panel">
-      <div id="table-controls">
-        <button class="tab-btn active" id="tab-live" onclick="setTab('live')">Live window</button>
-        <input id="filter-input" placeholder="Search…" oninput="applyFilters()"/>
-        <select id="zone-select" onchange="applyFilters()">
-          <option value="">All zones</option>
-          <option>1</option><option>2</option><option>3</option>
-        </select>
-        <span id="rec-count"></span>
+    <div id="tbl-panel">
+      <div id="tbl-ctl">
+        <button class="tab-btn active" id="tab-wcl" onclick="setTab('wcl')">WCL <span id="tc-wcl"></span></button>
+        <button class="tab-btn" id="tab-cfs" onclick="setTab('cfs')">CFS <span id="tc-cfs"></span></button>
+        <button class="tab-btn" id="tab-trans" onclick="setTab('trans')">Transient <span id="tc-trans"></span></button>
+        <input id="fi" placeholder="Search…" oninput="renderTable()"/>
+        <span id="rct"></span>
       </div>
-      <div class="table-scroll">
-        <table id="incidents-table">
-          <thead>
-            <tr>
-              <th onclick="setSort('incident_date_and_time')">Date/Time<span class="sort-arrow" id="sh-date"></span></th>
-              <th onclick="setSort('incident_number')">Incident #<span class="sort-arrow" id="sh-num"></span></th>
-              <th onclick="setSort('call_type')">Type<span class="sort-arrow" id="sh-type"></span></th>
-              <th>Location</th>
-              <th onclick="setSort('police_zone')">Zone<span class="sort-arrow" id="sh-zone"></span></th>
-              <th onclick="setSort('watch_commander')">Commander<span class="sort-arrow" id="sh-cmd"></span></th>
-              <th onclick="setSort('priority_notification')">Prio<span class="sort-arrow" id="sh-prio"></span></th>
-            </tr>
-          </thead>
-          <tbody id="tbl-body"></tbody>
-        </table>
-      </div>
+      <div class="ts"><table id="tbl"><thead id="th"></thead><tbody id="tb"></tbody></table></div>
     </div>
   </div>
 </div>
 
-<!-- Footer -->
-<div id="footer">
-  <div>
-    Data: <a href="https://gis.cityoffullerton.com/arcgis/rest/services/Hosted/WatchCommanderLogs/FeatureServer/0" target="_blank">gis.cityoffullerton.com</a>
-    · Public ArcGIS REST · No authentication required
-    · <a href="https://github.com/CheerstoDogs/fullerton-wcl-live" target="_blank">GitHub</a>
-  </div>
-  <div>
-    Remarks gated · CPRA §6254 / PC §293 redaction review required ·
-    <a href="https://firstamendmentcoalition.org/handbook/police-transparency-handbook/" target="_blank">CA Police Transparency Law</a>
-  </div>
+<div id="foot">
+  <div>Data: <a href="https://gis.cityoffullerton.com/arcgis/rest/services/Hosted/" target="_blank">gis.cityoffullerton.com</a> · 3 public endpoints · No auth · <a href="https://github.com/CheersToDogs/fullerton-wcl" target="_blank">GitHub</a></div>
+  <div>WCL remarks gated · CPRA §6254 / PC §293 · <a href="https://firstamendmentcoalition.org/handbook/police-transparency-handbook/" target="_blank">CA Police Transparency Law</a></div>
 </div>
 
-<!-- Remarks gate modal -->
-<div class="modal-overlay" id="gate-modal" style="display:none" onclick="closeModal(event)">
-  <div class="modal" onclick="event.stopPropagation()">
-    <div class="modal-hdr">
-      <span class="modal-icon">⚠</span>
-      <h2>Redaction Review Authorization</h2>
-    </div>
-    <div class="modal-body">
-      <p>The <strong>Remarks</strong> field contains the full narrative text of incident <code id="gate-num"></code>, as entered by the watch commander.</p>
-      <p>This field may contain information California law requires to be reviewed and redacted before public release, including:</p>
+<div class="modal-ov" id="gate-modal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal">
+    <div class="mhd"><span>⚠</span><h2>Redaction Review Authorization</h2></div>
+    <div class="mbd">
+      <p>The <strong>Remarks</strong> field for <code id="gate-num"></code> contains the full watch commander narrative.</p>
+      <p>California law requires review before public release:</p>
       <ul>
-        <li>Victim identifying information in sexual assault cases (PC §293)</li>
+        <li>Sexual assault victim identities (PC §293)</li>
         <li>Juvenile identifying information</li>
         <li>Active investigation details (CPRA §6254)</li>
         <li>Witness identifying information</li>
       </ul>
-      <p>This data is published by the City of Fullerton at a public ArcGIS endpoint without redaction review. This viewer surfaces the misconfiguration for responsible disclosure and redaction compliance.</p>
-      <p class="modal-confirm">By proceeding, you confirm you are authorized to view this field for purposes of redaction review, security research, or journalism.</p>
+      <p class="mconfirm">By proceeding you confirm authorization for redaction review, security research, or journalism.</p>
     </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
-      <button class="btn-auth" onclick="authorizeRemarks()">I confirm — show remarks</button>
+    <div class="mact">
+      <button class="btn-x" onclick="document.getElementById('gate-modal').style.display='none'">Cancel</button>
+      <button class="btn-ok" onclick="authorizeRemarks()">Confirm — show remarks</button>
     </div>
   </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
-// ── Constants ──────────────────────────────────────────────────────────
-const ARCGIS = 'https://gis.cityoffullerton.com/arcgis/rest/services/Hosted/WatchCommanderLogs/FeatureServer/0';
-const POLL_MS = 30000;
+const EP={
+  wcl:'https://gis.cityoffullerton.com/arcgis/rest/services/Hosted/WatchCommanderLogs/FeatureServer/0',
+  cfs:'https://gis.cityoffullerton.com/arcgis/rest/services/Hosted/CFS_Public/FeatureServer/0',
+  trans:'https://gis.cityoffullerton.com/arcgis/rest/services/Hosted/Transient_Calls_for_Service/FeatureServer/0',
+};
+const ZONE={1:'#3182ce',2:'#38a169',3:'#d69e2e'};
+const CALLS={'211 PC':{l:'Robbery',c:'#e53e3e'},'459 PC':{l:'Burglary',c:'#dd6b20'},'261 PC':{l:'Sexual Assault',c:'#805ad5'},'242 PC':{l:'Battery',c:'#d69e2e'},'245 PC':{l:'Assault w/Weapon',c:'#e53e3e'},'487 PC':{l:'Grand Theft',c:'#dd6b20'},'594 PC':{l:'Vandalism',c:'#718096'},'927D':{l:'Death Investigation',c:'#a0aec0'},'Domestic Violence':{l:'DV',c:'#9b2c2c'},'TRPROB':{l:'Transient Problem',c:'#60a5fa'},'415':{l:'Disturbance',c:'#6366f1'},'390':{l:'Drunk',c:'#8b5cf6'},'5150':{l:'Mental Health',c:'#ec4899'},'MHPROP':{l:'Mental Health',c:'#ec4899'},'Other':{l:'Other',c:'#4a5568'}};
+function ci(raw){if(!raw)return{l:'Unknown',c:'#718096'};if(CALLS[raw])return CALLS[raw];const k=Object.keys(CALLS).find(k=>raw.toUpperCase().includes(k));return k?CALLS[k]:{l:raw.length>22?raw.slice(0,20)+'…':raw,c:'#4a5568'}}
+function fDT(ts){if(!ts)return'—';return new Date(ts).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})}
+function fD(ts){if(!ts)return'—';return new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}
+function fT(ts){if(!ts)return'—';return new Date(ts).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:false})}
+function ago(ts){if(!ts)return'';const m=Math.floor((Date.now()-ts)/60000);if(m<1)return'just now';if(m<60)return m+'m ago';const h=Math.floor(m/60);if(h<24)return h+'h ago';return Math.floor(h/24)+'d ago'}
+function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'):''}
 
-const ZONE_COLORS = { '1':'#3182ce', '2':'#38a169', '3':'#d69e2e' };
+// ── State ──
+const D={wcl:[],cfs:[],trans:[]};
+const LV={wcl:true,cfs:true,trans:true};
+let tab='wcl',selId=null,selSrc=null,sk=null,sd='desc',lastFetch=null,gateRec=null,pollT=null;
+let remarksOK=sessionStorage.getItem('wcl_auth')==='true';
 
-const CALL_MAP = {
-  '211 PC':           {label:'Robbery',           color:'#e53e3e'},
-  '459 PC':           {label:'Burglary',           color:'#dd6b20'},
-  '261 PC':           {label:'Sexual Assault',     color:'#805ad5'},
-  '242 PC':           {label:'Battery',            color:'#d69e2e'},
-  '243 PC':           {label:'Battery on Officer', color:'#e53e3e'},
-  '245 PC':           {label:'Assault w/ Weapon',  color:'#e53e3e'},
-  '487 PC':           {label:'Grand Theft',        color:'#dd6b20'},
-  '594 PC':           {label:'Vandalism',          color:'#718096'},
-  '927D':             {label:'Death Investigation',color:'#a0aec0'},
-  'Domestic Violence':{label:'Domestic Violence',  color:'#9b2c2c'},
-  'Other':            {label:'Other',              color:'#4a5568'},
+// ── Map ──
+const map=L.map('map',{center:[33.8704,-117.9242],zoom:13});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© OSM © CARTO',maxZoom:19}).addTo(map);
+
+function mkCluster(color){
+  return L.markerClusterGroup({maxClusterRadius:40,iconCreateFunction:c=>{
+    const n=c.getChildCount();
+    return L.divIcon({className:'',iconSize:[34,34],html:`<div style="background:${color}55;border:2px solid ${color};border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-family:monospace;font-size:10px;font-weight:700;color:#fff">${n>999?'1k+':n}</div>`});
+  }});
+}
+
+const MG={
+  wcl:L.layerGroup().addTo(map),
+  cfs:mkCluster('#eab308').addTo(map),
+  trans:mkCluster('#3b82f6').addTo(map),
+};
+const MR={wcl:{},cfs:{},trans:{}};
+
+// ── Status ──
+function setS(s){
+  const dot=document.getElementById('live-dot'),lbl=document.getElementById('live-lbl');
+  dot.className='live-dot '+({live:'dot-live',load:'dot-load',err:'dot-err',idle:'dot-idle'}[s]||'dot-idle');
+  lbl.textContent={live:'Live · WCL',load:'Refreshing…',err:'Connection error',idle:'Connecting…'}[s]||s;
+}
+setInterval(()=>{if(lastFetch)document.getElementById('live-age').textContent='· '+ago(lastFetch)},10000);
+
+// ── WCL fetch (live, polled) ──
+async function fetchWCL(){
+  setS('load');
+  try{
+    const p=new URLSearchParams({where:'1=1',outFields:'*',returnGeometry:'true',resultRecordCount:'2000',orderByFields:'incident_date_and_time DESC',outSR:'4326',f:'json'});
+    const r=await fetch(`${EP.wcl}/query?${p}`);
+    const d=await r.json();
+    if(d.error)throw new Error(d.error.message);
+    D.wcl=(d.features||[]).map(f=>({...f.attributes,lat:f.geometry?.y??null,lon:f.geometry?.x??null,_src:'wcl',_id:f.attributes.objectid}));
+    lastFetch=Date.now();
+    setS('live');
+    document.getElementById('s-wcl').textContent=D.wcl.length;
+    document.getElementById('tc-wcl').textContent='('+D.wcl.length+')';
+    updateTotal();
+    renderMarkers('wcl');
+    if(tab==='wcl')renderTable();
+  }catch(e){setS('err');console.error(e)}
+}
+function refreshWCL(){clearInterval(pollT);fetchWCL();pollT=setInterval(fetchWCL,30000)}
+
+// ── CFS fetch (paginated background) ──
+async function fetchCFS(){
+  const pg=document.getElementById('prog');
+  pg.style.display='block';
+  let offset=0,all=[];
+  const total=100345,pageSize=1000;
+  while(true){
+    try{
+      document.getElementById('prog-bar').style.width=(all.length/total*50)+'%';
+      document.getElementById('prog-txt').textContent=`Loading Calls for Service: ${all.length.toLocaleString()} / ~${total.toLocaleString()}`;
+      const p=new URLSearchParams({where:'1=1',outFields:'objectid,primary_key,occ_datetime',returnGeometry:'true',resultRecordCount:pageSize,resultOffset:offset,outSR:'4326',f:'json'});
+      const r=await fetch(`${EP.cfs}/query?${p}`);
+      const d=await r.json();
+      const feats=d.features||[];
+      if(!feats.length)break;
+      feats.forEach(f=>all.push({objectid:f.attributes.objectid,primary_key:f.attributes.primary_key,occ_datetime:f.attributes.occ_datetime,lat:f.geometry?.y??null,lon:f.geometry?.x??null,_src:'cfs',_id:f.attributes.objectid}));
+      offset+=feats.length;
+      if(!d.exceededTransferLimit)break;
+      await new Promise(r=>setTimeout(r,0));
+    }catch(e){console.error('CFS page err:',e);break}
+  }
+  D.cfs=all;
+  document.getElementById('s-cfs').textContent=all.length.toLocaleString();
+  document.getElementById('tc-cfs').textContent='('+all.length.toLocaleString()+')';
+  updateTotal();
+  renderMarkers('cfs');
+  if(tab==='cfs')renderTable();
+  await fetchTransient();
+  pg.style.display='none';
+}
+
+// ── Transient CFS fetch ──
+async function fetchTransient(){
+  let offset=0,all=[];
+  const total=24429,pageSize=2000;
+  while(true){
+    try{
+      document.getElementById('prog-bar').style.width=(50+all.length/total*50)+'%';
+      document.getElementById('prog-txt').textContent=`Loading Transient CFS: ${all.length.toLocaleString()} / ~${total.toLocaleString()}`;
+      const p=new URLSearchParams({where:'1=1',outFields:'objectid,callnumber,calldate,calltime,initialcalltype,finalcalltype,location,founded,clearedby,callyear',returnGeometry:'true',resultRecordCount:pageSize,resultOffset:offset,outSR:'4326',f:'json'});
+      const r=await fetch(`${EP.trans}/query?${p}`);
+      const d=await r.json();
+      const feats=d.features||[];
+      if(!feats.length)break;
+      feats.forEach(f=>all.push({...f.attributes,lat:f.geometry?.y??null,lon:f.geometry?.x??null,_src:'trans',_id:f.attributes.objectid}));
+      offset+=feats.length;
+      if(!d.exceededTransferLimit)break;
+      await new Promise(r=>setTimeout(r,0));
+    }catch(e){console.error('Trans page err:',e);break}
+  }
+  D.trans=all;
+  document.getElementById('s-trans').textContent=all.length.toLocaleString();
+  document.getElementById('tc-trans').textContent='('+all.length.toLocaleString()+')';
+  updateTotal();
+  renderMarkers('trans');
+  if(tab==='trans')renderTable();
+}
+
+function updateTotal(){
+  document.getElementById('s-total').textContent=(D.wcl.length+D.cfs.length+D.trans.length).toLocaleString();
+}
+
+// ── Markers ──
+function pin(color,size,border){
+  return`<div style="background:${color};border:${border||'2px solid '+color+'88'};width:${size}px;height:${size}px;border-radius:50%;box-shadow:0 0 4px ${color}77;cursor:pointer"></div>`;
+}
+
+function renderMarkers(src){
+  MG[src].clearLayers();
+  MR[src]={};
+  D[src].forEach(r=>{
+    if(!r.lat||!r.lon)return;
+    let ic,pop;
+    if(src==='wcl'){
+      const{l,c}=ci(r.call_type);
+      const zc=ZONE[r.police_zone]||'#718096';
+      ic=L.divIcon({className:'',html:pin(c,13,`2px solid ${zc}`),iconSize:[13,13],iconAnchor:[6,6]});
+      pop=`<div class="pp"><span class="pp-badge" style="background:${c}22;color:${c};border:1px solid ${c}44">${esc(l)}</span><div style="color:var(--muted);font-size:11px">${esc(r.incident_number||'')}</div><div class="pp-loc">${esc(r.location||'')}</div><div class="pp-time">${fDT(r.incident_date_and_time)}</div><div class="pp-meta">Cmd: ${esc(r.watch_commander||'—')} · Zone ${r.police_zone||'?'}</div></div>`;
+    }else if(src==='cfs'){
+      ic=L.divIcon({className:'',html:pin('#eab308',7,'1px solid #eab30877'),iconSize:[7,7],iconAnchor:[3,3]});
+      pop=`<div class="pp"><span class="pp-badge" style="background:#eab30822;color:#eab308;border:1px solid #eab30844">Call for Service</span><div class="pp-time">${fDT(r.occ_datetime)}</div><div class="pp-meta">CAD: ${r.primary_key||'—'}</div></div>`;
+    }else{
+      const{l,c}=ci(r.initialcalltype);
+      ic=L.divIcon({className:'',html:pin('#3b82f6',8,'1px solid #3b82f677'),iconSize:[8,8],iconAnchor:[4,4]});
+      pop=`<div class="pp"><span class="pp-badge" style="background:#3b82f622;color:#3b82f6;border:1px solid #3b82f644">${esc(l)}</span><div class="pp-loc">${esc(r.location||'')}</div><div class="pp-time">${fD(r.calldate)} ${r.calltime||''}</div><div class="pp-ok">Cleared: ${esc((r.clearedby||'—').trim())}</div><div class="pp-meta">Founded: ${r.founded||'—'}</div></div>`;
+    }
+    const id=r._id;
+    const m=L.marker([r.lat,r.lon],{icon:ic}).bindPopup(pop,{maxWidth:260}).on('click',()=>select(id,src));
+    m.addTo(MG[src]);
+    MR[src][id]=m;
+  });
+}
+
+function toggleLayer(src){
+  LV[src]=!LV[src];
+  document.getElementById(`btn-${src}`).classList.toggle('off',!LV[src]);
+  if(LV[src])map.addLayer(MG[src]);else map.removeLayer(MG[src]);
+}
+
+// ── Selection ──
+function select(id,src){
+  selId=id;selSrc=src;
+  const r=D[src].find(x=>x._id===id);
+  if(!r)return;
+  renderTable();
+  showCard(r,src);
+  const m=MR[src][id];
+  if(m){map.panTo(m.getLatLng(),{animate:true,duration:.4});m.openPopup()}
+}
+function closeCard(){document.getElementById('card').style.display='none';selId=null;selSrc=null;renderTable()}
+
+function showCard(r,src){
+  document.getElementById('card').style.display='block';
+  const srcCfg={wcl:{l:'WCL',bg:'#ef444422',c:'#ef4444'},cfs:{l:'CFS',bg:'#eab30822',c:'#eab308'},trans:{l:'TRANSIENT',bg:'#3b82f622',c:'#3b82f6'}}[src];
+  document.getElementById('c-src-badge').innerHTML=`<span style="background:${srcCfg.bg};color:${srcCfg.c};padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;letter-spacing:.05em">${srcCfg.l}</span>`;
+  document.getElementById('c-prio').style.display='none';
+
+  let typeStr='',numStr='',subStr='',bodyHtml='';
+
+  if(src==='wcl'){
+    const{l,c}=ci(r.call_type);
+    const zc=ZONE[r.police_zone]||'#718096';
+    document.getElementById('card-hdr').style.borderLeftColor=c;
+    typeStr=`<span style="color:${c}">${esc(l)}</span>`;
+    numStr=esc(r.incident_number||'');
+    subStr=fDT(r.incident_date_and_time);
+    if(r.priority_notification==='Y')document.getElementById('c-prio').style.display='inline';
+    bodyHtml=row('Location',esc(r.location||'—'))
+      +row('Zone',`<span style="color:${zc}">Zone ${r.police_zone||'?'}</span>`)
+      +row('Commander',esc(r.watch_commander||'—'))
+      +(r.notifications&&r.notifications!=='[]'?row('Notified',`<span class="cv-warn">${esc(Array.isArray(r.notifications)?r.notifications.join(', '):r.notifications)}</span>`):'')
+      +(r.suspect_vehicle_description?row('Vehicle',`<span class="cv-warn">${esc(r.suspect_vehicle_description)}</span>`):'')
+      +`<div class="rem-sec"><div class="rem-lbl">Remarks<span class="rem-note">· CPRA §6254 / PC §293 gate</span></div><div id="rem-body">${remarksGateHtml(r)}</div></div>`;
+    gateRec=r;
+  }else if(src==='cfs'){
+    document.getElementById('card-hdr').style.borderLeftColor='#eab308';
+    typeStr='<span style="color:#eab308">Call for Service</span>';
+    numStr='';
+    subStr=fDT(r.occ_datetime);
+    bodyHtml=row('Location','Geolocated on map (no address field in public data)')
+      +row('CAD key',String(r.primary_key||'—'))
+      +row('Date/Time',fDT(r.occ_datetime));
+  }else{
+    const{l,c}=ci(r.initialcalltype);
+    document.getElementById('card-hdr').style.borderLeftColor='#3b82f6';
+    typeStr=`<span style="color:${c}">${esc(l)}</span>`;
+    numStr=esc(r.callnumber||'');
+    subStr=`${fD(r.calldate)} ${r.calltime||''}`;
+    bodyHtml=row('Location',esc(r.location||'—'))
+      +(r.finalcalltype&&r.finalcalltype!==r.initialcalltype?row('Final type',esc(r.finalcalltype)):'')
+      +row('Cleared by',`<span style="color:var(--ok)">${esc((r.clearedby||'—').trim())}</span>`)
+      +row('Founded',esc(r.founded||'—'))
+      +(r.callyear?row('Year',String(r.callyear)):'');
+  }
+  document.getElementById('c-type').innerHTML=typeStr;
+  document.getElementById('c-num').textContent=numStr;
+  document.getElementById('c-sub').textContent=subStr;
+  document.getElementById('card-body').innerHTML=bodyHtml;
+}
+
+function row(k,v){return`<div class="cr"><span class="ck">${k}</span><span class="cv">${v}</span></div>`}
+
+function remarksGateHtml(r){
+  if(!r.remarks)return`<span style="color:var(--muted);font-style:italic">No remarks on file</span>`;
+  if(remarksOK)return`<div class="rem-warn">⚠ Unredacted · CPRA review required</div><div class="rem-txt">${esc(r.remarks)}</div>`;
+  return`<button class="gate-btn" onclick="openGate()">🔒 Authorized access only — confirm redaction review</button>`;
+}
+function openGate(){document.getElementById('gate-num').textContent=gateRec?.incident_number||'';document.getElementById('gate-modal').style.display='flex'}
+function authorizeRemarks(){
+  remarksOK=true;sessionStorage.setItem('wcl_auth','true');
+  document.getElementById('gate-modal').style.display='none';
+  const b=document.getElementById('rem-body');
+  if(b&&gateRec)b.innerHTML=remarksGateHtml(gateRec);
+}
+
+// ── Table ──
+const COLS={
+  wcl:[{k:'incident_date_and_time',l:'Date/Time'},{k:'incident_number',l:'Incident #'},{k:'call_type',l:'Type'},{k:'location',l:'Location'},{k:'police_zone',l:'Zone'},{k:'watch_commander',l:'Commander'},{k:'priority_notification',l:'P'}],
+  cfs:[{k:'occ_datetime',l:'Date/Time'},{k:'primary_key',l:'CAD Key'}],
+  trans:[{k:'calldate',l:'Date'},{k:'callnumber',l:'Call #'},{k:'initialcalltype',l:'Type'},{k:'location',l:'Location'},{k:'founded',l:'Founded'},{k:'clearedby',l:'Cleared by'}],
 };
 
-function callInfo(raw) {
-  if (!raw) return {label:'Unknown', color:'#718096'};
-  if (CALL_MAP[raw]) return CALL_MAP[raw];
-  const k = Object.keys(CALL_MAP).find(k => raw.toUpperCase().includes(k.toUpperCase()));
-  return k ? CALL_MAP[k] : {label: raw, color:'#4a5568'};
-}
-
-function fmtDT(ts) {
-  if (!ts) return '—';
-  const d = new Date(ts);
-  return d.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
-}
-function fmtDate(ts) {
-  if (!ts) return '—';
-  return new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-}
-function fmtTime(ts) {
-  if (!ts) return '—';
-  return new Date(ts).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:false});
-}
-function timeAgo(ts) {
-  if (!ts) return '';
-  const m = Math.floor((Date.now()-ts)/60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return m+'m ago';
-  const h = Math.floor(m/60);
-  if (h < 24) return h+'h ago';
-  return Math.floor(h/24)+'d ago';
-}
-
-// ── State ──────────────────────────────────────────────────────────────
-let allRecords = [];
-let selectedId = null;
-let sortKey = 'incident_date_and_time';
-let sortDir = 'desc';
-let knownIds = new Set();
-let lastFetch = null;
-let remarksAuthorized = sessionStorage.getItem('wcl_auth') === 'true';
-let gateTarget = null; // {id, remarks, num}
-let pollTimer = null;
-
-// ── Map setup ──────────────────────────────────────────────────────────
-const map = L.map('map', { center: [33.8704,-117.9242], zoom: 13 });
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-  attribution:'© OpenStreetMap © CARTO', maxZoom:19
-}).addTo(map);
-const markerLayer = L.layerGroup().addTo(map);
-const markerMap = {};
-
-// ── Fetch ──────────────────────────────────────────────────────────────
-async function fetchLive() {
-  const params = new URLSearchParams({
-    where:'1=1', outFields:'*', returnGeometry:'true',
-    resultRecordCount:'2000', orderByFields:'incident_date_and_time DESC',
-    outSR:'4326', f:'json'
-  });
-  const res = await fetch(`${ARCGIS}/query?${params}`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
-  return (data.features||[]).map(f => ({
-    ...f.attributes,
-    lat: f.geometry?.y ?? null,  // with outSR=4326: y=latitude, x=longitude
-    lon: f.geometry?.x ?? null,
-  }));
-}
-
-async function poll() {
-  setStatus('load');
-  try {
-    const recs = await fetchLive();
-    const fresh = recs.filter(r => !knownIds.has(r.objectid));
-    fresh.forEach(r => knownIds.add(r.objectid));
-
-    allRecords = recs;
-    lastFetch = Date.now();
-    setStatus('live');
-    hideError();
-
-    if (fresh.length > 0 && knownIds.size > fresh.length) {
-      const nb = document.getElementById('new-badge');
-      nb.textContent = `+${fresh.length} new`;
-      nb.style.display = 'inline';
-      setTimeout(() => nb.style.display='none', 8000);
-    }
-
-    renderStats();
-    renderMarkers();
-    renderTable();
-
-  } catch(e) {
-    setStatus('err');
-    showError('Cannot reach ArcGIS endpoint: ' + e.message);
-  }
-}
-
-function refresh() {
-  clearInterval(pollTimer);
-  poll();
-  pollTimer = setInterval(poll, POLL_MS);
-}
-
-// ── Status ─────────────────────────────────────────────────────────────
-function setStatus(s) {
-  const dot = document.getElementById('live-dot');
-  const lbl = document.getElementById('live-label');
-  dot.className = 'live-dot ' + ({live:'dot-live',load:'dot-load',err:'dot-err',idle:'dot-idle'}[s]||'dot-idle');
-  lbl.textContent = {live:'Live',load:'Refreshing…',err:'Error',idle:'Connecting…'}[s]||s;
-}
-function showError(m) {
-  const b = document.getElementById('error-banner');
-  b.textContent = '⚠ '+m; b.style.display='block';
-}
-function hideError() {
-  document.getElementById('error-banner').style.display='none';
-}
-
-// Update timeAgo every 10s
-setInterval(() => {
-  if (lastFetch) document.getElementById('live-age').textContent = '· '+timeAgo(lastFetch);
-}, 10000);
-
-// ── Stats ──────────────────────────────────────────────────────────────
-function renderStats() {
-  const recs = allRecords;
-  document.getElementById('s-total').textContent = recs.length;
-  document.getElementById('s-prio').textContent = recs.filter(r=>r.priority_notification==='Y').length;
-
-  const byZone = {};
-  const byType = {};
-  recs.forEach(r => {
-    const z = r.police_zone||'?';
-    byZone[z] = (byZone[z]||0)+1;
-    const {label} = callInfo(r.call_type);
-    byType[label] = (byType[label]||0)+1;
-  });
-
-  const zc = document.getElementById('zone-chips');
-  zc.innerHTML = Object.entries(byZone).sort().map(([z,n])=>`
-    <div class="zone-chip" style="border-color:${ZONE_COLORS[z]||'#718096'}">
-      <span class="z-dot" style="background:${ZONE_COLORS[z]||'#718096'}"></span>Zone ${z}: ${n}
-    </div>`).join('');
-
-  const tc = document.getElementById('type-chips');
-  tc.innerHTML = Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,4)
-    .map(([l,n])=>`<div class="type-chip"><span class="tc-lbl">${l}</span><span class="tc-cnt">${n}</span></div>`).join('');
-}
-
-// ── Markers ────────────────────────────────────────────────────────────
-function renderMarkers() {
-  markerLayer.clearLayers();
-  Object.keys(markerMap).forEach(k => delete markerMap[k]);
-
-  allRecords.forEach(r => {
-    if (!r.lat || !r.lon) return;
-    const {color,label} = callInfo(r.call_type);
-    const zc = ZONE_COLORS[r.police_zone]||'#718096';
-
-    const icon = L.divIcon({
-      className:'',
-      html:`<div style="background:${color};border:2px solid ${zc};width:13px;height:13px;border-radius:50%;box-shadow:0 0 5px ${color}88;cursor:pointer"></div>`,
-      iconSize:[13,13],iconAnchor:[6,6]
-    });
-
-    const m = L.marker([r.lat,r.lon],{icon})
-      .bindPopup(`<div class="map-popup">
-        <div class="pp-type" style="color:${color}">${label}</div>
-        <div class="pp-num">${r.incident_number||''}</div>
-        <div class="pp-loc">${r.location||''}</div>
-        <div class="pp-time">${fmtDT(r.incident_date_and_time)}</div>
-        <div class="pp-cmd">Cmd: ${r.watch_commander||'—'}</div>
-        <div class="pp-zone" style="color:${zc}">Zone ${r.police_zone||'?'}</div>
-      </div>`, {maxWidth:250})
-      .on('click',()=>selectRecord(r.objectid));
-
-    m.addTo(markerLayer);
-    markerMap[r.objectid] = m;
-  });
-}
-
-// ── Table ──────────────────────────────────────────────────────────────
-function setSort(key) {
-  const arrows = {
-    'incident_date_and_time':'sh-date','incident_number':'sh-num',
-    'call_type':'sh-type','police_zone':'sh-zone',
-    'watch_commander':'sh-cmd','priority_notification':'sh-prio'
-  };
-  if (sortKey===key) sortDir = sortDir==='asc'?'desc':'asc';
-  else { sortKey=key; sortDir='desc'; }
-  Object.values(arrows).forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='';});
-  const arrow = document.getElementById(arrows[key]);
-  if (arrow) arrow.textContent = sortDir==='asc'?' ▲':' ▼';
+function setTab(t){
+  tab=t;sk=null;
+  ['wcl','cfs','trans'].forEach(s=>document.getElementById(`tab-${s}`).className='tab-btn'+(s===t?' active':''));
   renderTable();
 }
 
-function applyFilters() { renderTable(); }
-
-function renderTable() {
-  const q = document.getElementById('filter-input').value.toLowerCase();
-  const zf = document.getElementById('zone-select').value;
-
-  let data = [...allRecords];
-
-  if (q) data = data.filter(r =>
-    (r.call_type||'').toLowerCase().includes(q) ||
-    (r.location||'').toLowerCase().includes(q) ||
-    (r.incident_number||'').toLowerCase().includes(q) ||
-    (r.watch_commander||'').toLowerCase().includes(q)
-  );
-  if (zf) data = data.filter(r => String(r.police_zone)===zf);
-
-  data.sort((a,b)=>{
-    const av=a[sortKey]??'', bv=b[sortKey]??'';
-    const c = av<bv?-1:av>bv?1:0;
-    return sortDir==='asc'?c:-c;
-  });
-
-  document.getElementById('rec-count').textContent = data.length+' record'+(data.length!==1?'s':'');
-
-  const tbody = document.getElementById('tbl-body');
-  if (data.length===0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="td-empty">No records match</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = data.map(r => {
-    const {label,color} = callInfo(r.call_type);
-    const zc = ZONE_COLORS[r.police_zone]||'#718096';
-    const sel = r.objectid===selectedId ? 'selected':'';
-    return `<tr class="t-row ${sel}" onclick="selectRecord(${r.objectid})">
-      <td><div class="td-date">${fmtDate(r.incident_date_and_time)}</div><div class="td-clk">${fmtTime(r.incident_date_and_time)}</div></td>
-      <td class="td-num">${r.incident_number||'—'}</td>
-      <td><span class="type-pill" style="background:${color}22;color:${color};border:1px solid ${color}44">${label}</span></td>
-      <td class="td-loc">${r.location||'—'}</td>
-      <td><span class="zone-badge" style="color:${zc};border:1px solid ${zc}">${r.police_zone||'?'}</span></td>
-      <td>${r.watch_commander||'—'}</td>
-      <td>${r.priority_notification==='Y'?'<span class="prio-yes">⚑</span>':'<span class="prio-no">—</span>'}</td>
-    </tr>`;
-  }).join('');
+function renderTable(){
+  const q=document.getElementById('fi').value.toLowerCase();
+  const cols=COLS[tab];
+  document.getElementById('th').innerHTML=`<tr>${cols.map(c=>`<th onclick="doSort('${c.k}')">${c.l}${sk===c.k?' '+(sd==='asc'?'▲':'▼'):''}</th>`).join('')}</tr>`;
+  let rows=[...D[tab]];
+  if(q)rows=rows.filter(r=>cols.some(c=>{const v=r[c.k];return v&&String(v).toLowerCase().includes(q)}));
+  if(sk)rows.sort((a,b)=>{const av=a[sk]??'',bv=b[sk]??'',c=av<bv?-1:av>bv?1:0;return sd==='asc'?c:-c});
+  document.getElementById('rct').textContent=rows.length.toLocaleString()+' records';
+  const shown=rows.slice(0,600);
+  document.getElementById('tb').innerHTML=shown.map(r=>{
+    const id=r._id;
+    const isSel=id===selId&&tab===selSrc;
+    const cells=cols.map(c=>{
+      const v=r[c.k];
+      if(c.k==='incident_date_and_time'||c.k==='occ_datetime')return`<td><div>${fD(v)}</div><div style="color:var(--muted);font-size:9px">${fT(v)}</div></td>`;
+      if(c.k==='calldate')return`<td><div>${fD(v)}</div><div style="color:var(--muted);font-size:9px">${r.calltime||''}</div></td>`;
+      if(c.k==='call_type'||c.k==='initialcalltype'){const{l,c:col}=ci(v);return`<td><span class="tp" style="background:${col}22;color:${col};border:1px solid ${col}44">${esc(l)}</span></td>`}
+      if(c.k==='priority_notification')return`<td>${v==='Y'?'<span class="py">⚑</span>':'<span style="color:var(--muted)">—</span>'}</td>`;
+      if(c.k==='police_zone'){const zc=ZONE[v]||'#718096';return`<td><span style="color:${zc};border:1px solid ${zc};padding:1px 5px;border-radius:3px;font-size:9px">${v||'?'}</span></td>`}
+      if(c.k==='location'||c.k==='clearedby')return`<td class="td-s">${esc(v?String(v).trim():'—')}</td>`;
+      return`<td>${esc(String(v??'—'))}</td>`;
+    }).join('');
+    return`<tr class="tr${isSel?' sel':''}" onclick="select(${JSON.stringify(id)},'${tab}')">${cells}</tr>`;
+  }).join('')+(rows.length>600?`<tr><td colspan="${cols.length}" class="td-empty">+ ${(rows.length-600).toLocaleString()} more — use search to filter</td></tr>`:'');
 }
 
-// ── Card ───────────────────────────────────────────────────────────────
-function selectRecord(id) {
-  selectedId = (selectedId===id) ? null : id;
-  renderTable();
+function doSort(k){if(sk===k)sd=sd==='asc'?'desc':'asc';else{sk=k;sd='desc';}renderTable()}
 
-  if (!selectedId) { closeCard(); return; }
-
-  const r = allRecords.find(x=>x.objectid===id);
-  if (!r) return;
-
-  const {label,color} = callInfo(r.call_type);
-  const zc = ZONE_COLORS[r.police_zone]||'#718096';
-
-  document.getElementById('card-hdr').style.borderLeftColor = color;
-  document.getElementById('c-type').textContent = label;
-  document.getElementById('c-type').style.color = color;
-  document.getElementById('c-num').textContent = r.incident_number||'';
-  const prio = document.getElementById('c-prio');
-  prio.style.display = r.priority_notification==='Y'?'inline':'none';
-  document.getElementById('c-time').textContent = fmtDT(r.incident_date_and_time);
-  document.getElementById('c-loc').textContent = r.location||'—';
-  document.getElementById('c-zone').textContent = `Zone ${r.police_zone||'?'}`;
-  document.getElementById('c-zone').style.color = zc;
-  document.getElementById('c-cmd').textContent = r.watch_commander||'—';
-
-  const notifRow = document.getElementById('c-notif-row');
-  const notif = r.notifications;
-  if (notif && notif!=='[]' && notif!=='') {
-    document.getElementById('c-notif').textContent = Array.isArray(notif)?notif.join(', '):notif;
-    notifRow.style.display='flex';
-  } else notifRow.style.display='none';
-
-  const vehRow = document.getElementById('c-veh-row');
-  if (r.suspect_vehicle_description) {
-    document.getElementById('c-veh').textContent = r.suspect_vehicle_description;
-    vehRow.style.display='flex';
-  } else vehRow.style.display='none';
-
-  // Remarks gate
-  renderRemarksGate(r);
-
-  document.getElementById('incident-card').style.display='block';
-
-  // Pan map
-  if (r.lat && r.lon && markerMap[id]) {
-    map.panTo([r.lat,r.lon],{animate:true,duration:0.4});
-    markerMap[id].openPopup();
-  }
-}
-
-function renderRemarksGate(r) {
-  const body = document.getElementById('remarks-body');
-  if (!r.remarks) {
-    body.innerHTML = `<span style="color:var(--muted);font-style:italic">No remarks</span>`;
-    return;
-  }
-  if (remarksAuthorized) {
-    body.innerHTML = `<div class="remarks-warn">⚠ Unredacted · contains operational data subject to CPRA review</div>
-      <div class="remarks-text">${escHtml(r.remarks)}</div>`;
-  } else {
-    body.innerHTML = `<button class="gate-btn" onclick="openGate(${r.objectid})">
-      🔒 Authorized access only — click to confirm redaction review
-    </button>`;
-  }
-}
-
-function openGate(id) {
-  const r = allRecords.find(x=>x.objectid===id);
-  if (!r) return;
-  gateTarget = r;
-  document.getElementById('gate-num').textContent = r.incident_number||String(id);
-  document.getElementById('gate-modal').style.display='flex';
-}
-
-function authorizeRemarks() {
-  remarksAuthorized = true;
-  sessionStorage.setItem('wcl_auth','true');
-  document.getElementById('gate-modal').style.display='none';
-  if (gateTarget) renderRemarksGate(gateTarget);
-}
-
-function closeModal(e) {
-  if (!e || e.target===document.getElementById('gate-modal'))
-    document.getElementById('gate-modal').style.display='none';
-}
-
-function closeCard() {
-  document.getElementById('incident-card').style.display='none';
-  selectedId = null;
-  renderTable();
-}
-
-function setTab(t) {
-  // Future: hook up archive API here
-  document.getElementById('tab-live').className = 'tab-btn'+(t==='live'?' active':'');
-}
-
-function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-// ── Init ───────────────────────────────────────────────────────────────
-document.getElementById('sh-date').textContent = ' ▼'; // default sort indicator
-poll();
-pollTimer = setInterval(poll, POLL_MS);
+// ── Boot ──
+fetchWCL();
+pollT=setInterval(fetchWCL,30000);
+setTimeout(fetchCFS,800);
 </script>
 </body>
 </html>
