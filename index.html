@@ -397,7 +397,12 @@ function renderMarkers(src){
       pop=`<div class="pp"><span class="pp-badge" style="background:${c}22;color:${c};border:1px solid ${c}44">${esc(l)}</span><div style="color:var(--muted);font-size:11px">${esc(r.incident_number||'')}</div><div class="pp-loc">${esc(r.location||'')}</div><div class="pp-time">${fDT(r.incident_date_and_time)}</div><div class="pp-meta">Cmd: ${esc(r.watch_commander||'—')} · Zone ${r.police_zone||'?'}</div></div>`;
     }else if(src==='cfs'){
       ic=L.divIcon({className:'',html:pin('#eab308',7,'1px solid #eab30877'),iconSize:[7,7],iconAnchor:[3,3]});
-      pop=`<div class="pp"><span class="pp-badge" style="background:#eab30822;color:#eab308;border:1px solid #eab30844">Call for Service</span><div class="pp-time">${fDT(r.occ_datetime)}</div><div class="pp-meta">CAD: ${r.primary_key||'—'}</div></div>`;
+      pop=`<div class="pp">
+        <span class="pp-badge" style="background:#eab30822;color:#eab308;border:1px solid #eab30844">Call for Service</span>
+        <div class="pp-time">${fDT(r.occ_datetime)}</div>
+        <div class="pp-meta">CAD key: ${r.primary_key||'—'}</div>
+        <div style="color:var(--muted);font-size:10px;margin-top:4px;font-style:italic">⚠ Public layer has no call type or address</div>
+      </div>`;
     }else{
       const{l,c}=ci(r.initialcalltype);
       ic=L.divIcon({className:'',html:pin('#3b82f6',8,'1px solid #3b82f677'),iconSize:[8,8],iconAnchor:[4,4]});
@@ -456,9 +461,14 @@ function showCard(r,src){
     typeStr='<span style="color:#eab308">Call for Service</span>';
     numStr='';
     subStr=fDT(r.occ_datetime);
-    bodyHtml=row('Location','Geolocated on map (no address field in public data)')
+    bodyHtml=row('Date/Time',fDT(r.occ_datetime))
       +row('CAD key',String(r.primary_key||'—'))
-      +row('Date/Time',fDT(r.occ_datetime));
+      +`<div style="margin-top:10px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.6">
+        <strong style="color:var(--warn)">⚠ Limited public data</strong><br>
+        The CFS_Public endpoint exposes only timestamp + CAD key.<br>
+        Call type, address, officer, and disposition are not in the public layer.<br>
+        Location is from attached geometry only.
+      </div>`;
   }else{
     const{l,c}=ci(r.initialcalltype);
     document.getElementById('card-hdr').style.borderLeftColor='#3b82f6';
